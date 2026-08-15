@@ -16,10 +16,8 @@ struct SceneEditSheet: View {
     var onPrevious:    (() -> Void)? = nil
     var onNext:        (() -> Void)? = nil
     var positionLabel: String?       = nil
-    /// The Breakdown section starts collapsed in normal scene editing (keeps a quick
-    /// duration/cast tweak fast), but the Breakdown Browser opens it expanded since
-    /// tagging is the whole point of that mode.
-    var breakdownExpandedByDefault: Bool = false
+    /// The Breakdown section starts expanded by default so breakdown fields are always directly accessible.
+    var breakdownExpandedByDefault: Bool = true
     /// Whether Delete Scene closes the sheet afterward. True everywhere this sheet is
     /// normally used (deleting a single scene you were editing should close it) — false
     /// for the Breakdown Browser, where closing on every delete would kick you out of a
@@ -33,7 +31,7 @@ struct SceneEditSheet: View {
     @State private var editCastText:      String      = ""   // comma-separated editing surface
     @State private var editSummary:       String      = ""
 
-    @State private var breakdownExpanded:      Bool   = false
+    @State private var breakdownExpanded:      Bool   = true
     @State private var editExtras:             String = ""
     @State private var editProps:              String = ""
     @State private var editSetDressing:        String = ""

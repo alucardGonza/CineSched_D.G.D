@@ -349,9 +349,10 @@ extension ContentView {
             for ps in parsed {
                 let type: DayNightType
                 switch ps.timeOfDay {
-                case .night: type = .night
-                case .dawn:  type = .dawn
-                case .dusk:  type = .dusk
+                case .night:     type = .night
+                case .dawn:      type = .dawn
+                case .dusk:      type = .dusk
+                case .afternoon: type = .afternoon
                 case .day, .unknown: type = .day
                 }
                 allScenes.append(Scene(

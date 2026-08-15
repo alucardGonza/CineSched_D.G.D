@@ -10,18 +10,22 @@ struct FinalDraftParser {
         case night
         case dawn
         case dusk
+        case afternoon
         case unknown
         
         init(from text: String) {
             let lowercased = text.lowercased()
-            if lowercased.contains("dawn") || lowercased.contains("sunrise") || lowercased.contains("amanecer") {
+                .folding(options: .diacriticInsensitive, locale: .current)
+            if lowercased.contains("dawn") || lowercased.contains("sunrise") || lowercased.contains("amanecer") || lowercased.contains("madrugada") || lowercased.contains("alba") {
                 self = .dawn
-            } else if lowercased.contains("dusk") || lowercased.contains("sunset") || lowercased.contains("twilight") || lowercased.contains("anochecer") {
+            } else if lowercased.contains("dusk") || lowercased.contains("sunset") || lowercased.contains("twilight") || lowercased.contains("anochecer") || lowercased.contains("crepusculo") || lowercased.contains("ocaso") {
                 self = .dusk
-            } else if lowercased.contains("day") || lowercased.contains("morning") || lowercased.contains("afternoon") {
-                self = .day
-            } else if lowercased.contains("night") || lowercased.contains("evening") {
+            } else if lowercased.contains("afternoon") || lowercased.contains("tarde") || lowercased.contains("atardecer") {
+                self = .afternoon
+            } else if lowercased.contains("night") || lowercased.contains("evening") || lowercased.contains("noche") || lowercased.contains("medianoche") {
                 self = .night
+            } else if lowercased.contains("day") || lowercased.contains("morning") || lowercased.contains("dia") || lowercased.contains("manana") {
+                self = .day
             } else {
                 self = .unknown
             }
@@ -55,13 +59,14 @@ struct FinalDraftParser {
     /// Extract scene components from a scene heading
     /// Examples:
     /// "3. EXT. WOODS - DAY" -> (number: "3", location: "EXT. WOODS", time: .day)
-    /// "INT. BEDROOM - NIGHT" -> (number: nil, location: "INT. BEDROOM", time: .night)
+    /// "24. INT. HOTEL RENAISANCE, HABITACIÓN, BAÑO. NOCHE." -> (number: "24", location: "INT. HOTEL RENAISANCE, HABITACIÓN, BAÑO", time: .night)
+    /// "3. EXT. HOTEL RENAISANCE, AZOTEA. TARDE." -> (number: "3", location: "EXT. HOTEL RENAISANCE, AZOTEA", time: .afternoon)
     static func parseSceneHeading(_ heading: String) -> (number: String?, location: String, timeOfDay: TimeOfDay) {
         var workingHeading = heading.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Extract scene number if present (e.g., "3.", "12A.", "5B.")
         var sceneNumber: String? = nil
-        let numberPattern = #"^(\d+[A-Z]?)\.\s*"#
+        let numberPattern = #"^(\d+[A-Za-z]?)\.\s*"#
         if let regex = try? NSRegularExpression(pattern: numberPattern),
            let match = regex.firstMatch(in: workingHeading, range: NSRange(workingHeading.startIndex..., in: workingHeading)) {
             if let range = Range(match.range(at: 1), in: workingHeading) {
@@ -73,28 +78,33 @@ struct FinalDraftParser {
             }
         }
         
-        // Split by hyphen or dash to separate location from time
-        let components = workingHeading.components(separatedBy: CharacterSet(charactersIn: "-–—"))
-        
         var location = workingHeading
         var timeOfDay = TimeOfDay.unknown
         
-        if components.count >= 2 {
-            // Last component is typically the time of day
-            location = components.dropLast().joined(separator: "-").trimmingCharacters(in: .whitespacesAndNewlines)
-            let timeString = components.last?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            timeOfDay = TimeOfDay(from: timeString)
+        // Check for trailing time of day (separated by -, –, —, ., /, or space) in English or Spanish
+        let timePattern = #"[-–—./,\s]+\s*\b(day|night|morning|afternoon|evening|dusk|dawn|dia|día|noche|tarde|amanecer|anochecer|madrugada|alba|atardecer|crepusculo|crepúsculo|ocaso|medianoche)\b\.?\s*$"#
+        if let regex = try? NSRegularExpression(pattern: timePattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: workingHeading, range: NSRange(workingHeading.startIndex..., in: workingHeading)),
+           let fullMatchRange = Range(match.range, in: workingHeading),
+           let timeWordRange = Range(match.range(at: 1), in: workingHeading) {
+            let timeStr = String(workingHeading[timeWordRange])
+            timeOfDay = TimeOfDay(from: timeStr)
+            workingHeading.removeSubrange(fullMatchRange)
+            location = workingHeading
         } else {
-            // No dash found, try to detect time in the full string
-            timeOfDay = TimeOfDay(from: workingHeading)
-            // If we found a time indicator, try to remove it from location
-            if timeOfDay != .unknown {
-                location = workingHeading.replacingOccurrences(of: #"\b(day|night|morning|afternoon|evening|dusk|dawn)\b"#, with: "", options: [.regularExpression, .caseInsensitive])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Split by hyphen or dash if present
+            let components = workingHeading.components(separatedBy: CharacterSet(charactersIn: "-–—"))
+            if components.count >= 2 {
+                location = components.dropLast().joined(separator: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+                let timeString = components.last?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                timeOfDay = TimeOfDay(from: timeString)
+            } else {
+                timeOfDay = TimeOfDay(from: workingHeading)
             }
         }
         
-        // Clean up location (remove extra spaces)
+        // Clean up location (remove extra spaces, trailing punctuation like trailing dots or hyphens)
+        location = location.trimmingCharacters(in: CharacterSet(charactersIn: " -–—.,/"))
         location = location.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         

@@ -6,19 +6,21 @@ import SwiftUI
 // MARK: - DayNightType
 
 enum DayNightType: String, Codable, CaseIterable {
-    case day    = "DAY"
-    case night  = "NIGHT"
-    case dawn   = "DAWN"
-    case dusk   = "DUSK"
-    case custom = "CUSTOM"
+    case day       = "DAY"
+    case night     = "NIGHT"
+    case dawn      = "DAWN"
+    case dusk      = "DUSK"
+    case afternoon = "AFTERNOON"
+    case custom    = "CUSTOM"
 
     var color: Color {
         switch self {
-        case .day:    return Color.orange
-        case .night:  return Color.blue
-        case .dawn:   return Color(red: 0.96, green: 0.72, blue: 0.18)
-        case .dusk:   return Color(red: 0.65, green: 0.35, blue: 0.85)
-        case .custom: return Color.green
+        case .day:       return Color.orange
+        case .night:     return Color.blue
+        case .dawn:      return Color(red: 0.96, green: 0.72, blue: 0.18)
+        case .dusk:      return Color(red: 0.65, green: 0.35, blue: 0.85)
+        case .afternoon: return Color(red: 0.92, green: 0.48, blue: 0.18)
+        case .custom:    return Color.green
         }
     }
 
@@ -26,21 +28,23 @@ enum DayNightType: String, Codable, CaseIterable {
 
     var shortCode: String {
         switch self {
-        case .day:    return "D"
-        case .night:  return "N"
-        case .dawn:   return "DW"
-        case .dusk:   return "DK"
-        case .custom: return "C"
+        case .day:       return "D"
+        case .night:     return "N"
+        case .dawn:      return "DW"
+        case .dusk:      return "DK"
+        case .afternoon: return "AFT"
+        case .custom:    return "C"
         }
     }
 
     var sortOrder: Int {
         switch self {
-        case .day:    return 0
-        case .dawn:   return 1
-        case .dusk:   return 2
-        case .night:  return 3
-        case .custom: return 4
+        case .day:       return 0
+        case .dawn:      return 1
+        case .afternoon: return 2
+        case .dusk:      return 3
+        case .night:     return 4
+        case .custom:    return 5
         }
     }
 }
@@ -462,16 +466,18 @@ struct ShootDay: Identifiable, Codable {
     var totalDuration:      Int { scenes.reduce(0) { $0 + $1.duration } }
     var totalEstimatedTime: Int { scenes.reduce(0) { $0 + $1.estimatedTime } }
 
-    var dayScenes:    [Scene] { scenes.filter { $0.dayNightType == .day } }
-    var nightScenes:  [Scene] { scenes.filter { $0.dayNightType == .night } }
-    var dawnScenes:   [Scene] { scenes.filter { $0.dayNightType == .dawn } }
-    var duskScenes:   [Scene] { scenes.filter { $0.dayNightType == .dusk } }
-    var customScenes: [Scene] { scenes.filter { $0.dayNightType == .custom } }
+    var dayScenes:       [Scene] { scenes.filter { $0.dayNightType == .day } }
+    var nightScenes:     [Scene] { scenes.filter { $0.dayNightType == .night } }
+    var dawnScenes:      [Scene] { scenes.filter { $0.dayNightType == .dawn } }
+    var duskScenes:      [Scene] { scenes.filter { $0.dayNightType == .dusk } }
+    var afternoonScenes: [Scene] { scenes.filter { $0.dayNightType == .afternoon } }
+    var customScenes:    [Scene] { scenes.filter { $0.dayNightType == .custom } }
 
-    var totalDayDuration:   Int { dayScenes.reduce(0)   { $0 + $1.duration } }
-    var totalNightDuration: Int { nightScenes.reduce(0) { $0 + $1.duration } }
-    var totalDawnDuration:  Int { dawnScenes.reduce(0)  { $0 + $1.duration } }
-    var totalDuskDuration:  Int { duskScenes.reduce(0)  { $0 + $1.duration } }
+    var totalDayDuration:       Int { dayScenes.reduce(0)       { $0 + $1.duration } }
+    var totalNightDuration:     Int { nightScenes.reduce(0)     { $0 + $1.duration } }
+    var totalDawnDuration:      Int { dawnScenes.reduce(0)      { $0 + $1.duration } }
+    var totalDuskDuration:      Int { duskScenes.reduce(0)      { $0 + $1.duration } }
+    var totalAfternoonDuration: Int { afternoonScenes.reduce(0) { $0 + $1.duration } }
 
     var allCast: [String] {
         Array(Set(scenes.flatMap { $0.cast })).sorted()

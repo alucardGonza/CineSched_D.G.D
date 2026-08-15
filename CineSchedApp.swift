@@ -94,6 +94,7 @@ struct CineSchedApp: App {
                 Button("Export Scene Breakdowns…") {
                     NotificationCenter.default.post(name: .csExportBreakdowns, object: nil)
                 }
+                .keyboardShortcut("e", modifiers: [.command, .option])
             }
 
             // A home for the one action that doesn't fit File/Edit/View
