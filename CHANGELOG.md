@@ -2,6 +2,15 @@
 
 All notable changes to CineSched are documented here.
 
+## [4.0] - 2026
+### Added
+- **Call Sheet Reference Redesign** — industry-standard layout in 100% English with clean light gray header, prominent general call time, quote of the day, 12h meal/milestone times (Ready to Shoot, Lunch, Snack, Wrap), nearest hospital, full scene breakdown with clean decorado sluglines, cast call, crew call times, and unified general notes.
+- **Production Contacts Sync** — Director, Producer, and 1st AD names and phone numbers in Production Setup automatically populate Call Sheet shooting contacts across every shoot day.
+- **Real Location with Live Autocomplete** — enter real set/location names when creating or editing scenes with predictive autocomplete suggestions from all project locations.
+- **Location Sync Without Duplicates** — distinct locations from scheduled scenes automatically populate the Call Sheet location list (LOC 1, LOC 2...) without repeats.
+- **Fountain & Highland Script Importer** — import industry standard `.fountain` and `.highland` script archives with full page pagination and character breakdown.
+- **Stripboard PDF Exporter** — export strip schedules directly to clean PDF sheets.
+
 ## [3.2] - 2026
 ### Added
 - **Custom scene type** — a third strip type alongside Day and Night, displayed in red. Use it for company moves, meal breaks, or any non-scene entry. Custom strips only require a title — page count and time estimate are optional
