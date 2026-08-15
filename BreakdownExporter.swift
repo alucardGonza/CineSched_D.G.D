@@ -70,12 +70,12 @@ struct BreakdownExporter {
             let gridBottom = rowY
 
             // Row 0: Breakdown Sheet # | Project Title | Scene #
-            let narrowCol1: CGFloat = 90
+            let narrowCol1: CGFloat = 115
             let wideCol1 = contentWidth - 2 * narrowCol1
             var x = margin
             drawCell(label: "BREAKDOWN SHEET #", value: "\(index + 1)",
                      rect: CGRect(x: x, y: rowTops[0] - rowHeights[0], width: narrowCol1, height: rowHeights[0]),
-                     valueSize: 12, valueBold: true, centered: true)
+                     valueSize: 13, valueBold: true, centered: true, labelSize: 9.0)
             x += narrowCol1
             drawCell(label: "", value: displayTitle,
                      rect: CGRect(x: x, y: rowTops[0] - rowHeights[0], width: wideCol1, height: rowHeights[0]),
@@ -83,24 +83,24 @@ struct BreakdownExporter {
             x += wideCol1
             drawCell(label: "SCENE #", value: sceneNumber.isEmpty ? "—" : sceneNumber,
                      rect: CGRect(x: x, y: rowTops[0] - rowHeights[0], width: narrowCol1, height: rowHeights[0]),
-                     valueSize: 15, valueBold: true, centered: true)
+                     valueSize: 15, valueBold: true, centered: true, labelSize: 9.0)
 
             // Row 1: INT/EXT (narrow) | Setting (wide) | Location (medium)
-            let intExtCol: CGFloat = 65
+            let intExtCol: CGFloat = 70
             let locationCol: CGFloat = 120
             let settingCol = contentWidth - intExtCol - locationCol
             x = margin
             drawCell(label: "INT / EXT", value: intExt,
                      rect: CGRect(x: x, y: rowTops[1] - rowHeights[1], width: intExtCol, height: rowHeights[1]),
-                     valueSize: 11, valueBold: true, centered: true)
+                     valueSize: 11, valueBold: true, centered: true, labelSize: 9.0)
             x += intExtCol
             drawCell(label: "SETTING", value: setting,
                      rect: CGRect(x: x, y: rowTops[1] - rowHeights[1], width: settingCol, height: rowHeights[1]),
-                     valueSize: 10.5, valueBold: false)
+                     valueSize: 10.0, valueBold: false, labelSize: 9.0)
             x += settingCol
             drawCell(label: "LOCATION", value: "",
                      rect: CGRect(x: x, y: rowTops[1] - rowHeights[1], width: locationCol, height: rowHeights[1]),
-                     valueSize: 10.5)
+                     valueSize: 10.0, labelSize: 9.0)
 
             // Row 2: Description (balanced) | Day/Night + Script Pages stacked in right column
             let rightCol2: CGFloat = 135
@@ -109,43 +109,48 @@ struct BreakdownExporter {
             x = margin
             drawCell(label: "DESCRIPTION", value: scene.summary,
                      rect: CGRect(x: x, y: rowTops[2] - rowHeights[2], width: descCol, height: rowHeights[2]),
-                     valueSize: 10.5)
+                     valueSize: 9.5, labelSize: 9.0)
             x += descCol
             drawCell(label: "DAY / NIGHT", value: scene.dayNightType.displayName,
                      rect: CGRect(x: x, y: rowTops[2] - halfHeight2, width: rightCol2, height: halfHeight2),
-                     valueSize: 11, valueBold: true, centered: true)
+                     valueSize: 11, valueBold: true, centered: true, labelSize: 9.0)
             drawCell(label: "SCRIPT PAGES", value: formattedEighths(scene.duration),
                      rect: CGRect(x: x, y: rowTops[2] - rowHeights[2], width: rightCol2, height: halfHeight2),
-                     valueSize: 11, valueBold: true, centered: true)
+                     valueSize: 11, valueBold: true, centered: true, labelSize: 9.0)
 
-            // Row 3: Cast | Extras / Background | Wardrobe
+            // Row 3: Cast | Extras / Background | Wardrobe (Prominent colored department titles: 11.5pt bold)
             drawThreeUp(row: 3, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
                         a: ("CAST", formatBulletList(scene.cast), castColor),
                         b: ("EXTRAS / BACKGROUND", formatBulletList(scene.extras), extrasColor),
-                        c: ("WARDROBE", formatBulletList(scene.wardrobe), wardrobeColor))
+                        c: ("WARDROBE", formatBulletList(scene.wardrobe), wardrobeColor),
+                        labelSize: 11.5)
 
             // Row 4: Hair & Makeup | Props | Set Dressing
             drawThreeUp(row: 4, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
                         a: ("HAIR & MAKEUP", formatBulletList(scene.makeupHair), hairMakeupColor),
                         b: ("PROPS", formatBulletList(scene.props), propsColor),
-                        c: ("SET DRESSING", formatBulletList(scene.setDressing), setDressColor))
+                        c: ("SET DRESSING", formatBulletList(scene.setDressing), setDressColor),
+                        labelSize: 11.5)
 
             // Row 5: Vehicles | Special Equipment | Stunts
             drawThreeUp(row: 5, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
                         a: ("VEHICLES", formatBulletList(scene.vehicles), vehiclesColor),
                         b: ("SPECIAL EQUIPMENT", formatBulletList(scene.specialEquipment), specialEqColor),
-                        c: ("STUNTS", formatBulletList(scene.stunts), stuntsColor))
+                        c: ("STUNTS", formatBulletList(scene.stunts), stuntsColor),
+                        labelSize: 11.5)
 
             // Row 6: SFX | VFX
             drawTwoUp(row: 6, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
                       a: ("SFX", formatBulletList(scene.sfx), sfxColor),
-                      b: ("VFX", formatBulletList(scene.vfx), vfxColor))
+                      b: ("VFX", formatBulletList(scene.vfx), vfxColor),
+                      labelSize: 11.5)
 
             // Row 7: Notes (full width)
             drawCell(label: "NOTES", value: scene.breakdownNotes,
                      rect: CGRect(x: margin, y: rowTops[7] - rowHeights[7], width: contentWidth, height: rowHeights[7]),
-                     valueSize: 10.5,
-                     labelColor: defaultColor)
+                     valueSize: 9.5,
+                     labelColor: defaultColor,
+                     labelSize: 10.0)
 
             // Footer: est. time + scene counter
             NSAttributedString(string: "Est. Time: \(formattedTime(scene.estimatedTime))", attributes: [
@@ -182,14 +187,14 @@ struct BreakdownExporter {
     /// Description has a balanced, controlled height. Unused department rows collapse to 24pt,
     /// and active department rows receive the freed space proportionally for their bulleted lists.
     private static func computeDynamicRowHeights(for scene: Scene, totalHeight: CGFloat) -> [CGFloat] {
-        let fixedRow0: CGFloat = 40 // Sheet # / Title / Scene #
+        let fixedRow0: CGFloat = 44 // Sheet # / Title / Scene #
         let fixedRow1: CGFloat = 48 // INT/EXT / Setting / Location
         
         // Controlled height for Description — ample space without ballooning
         let fixedRow2: CGFloat = scene.summary.count > 160 ? 90 : 76
         
         let availableForDepts = totalHeight - fixedRow0 - fixedRow1 - fixedRow2
-        let compactHeight: CGFloat = 24 // Height for empty category rows
+        let compactHeight: CGFloat = 28 // Height for empty category rows
         
         let row3HasContent = !scene.cast.isEmpty || !scene.extras.isEmpty || !scene.wardrobe.isEmpty
         let row4HasContent = !scene.makeupHair.isEmpty || !scene.props.isEmpty || !scene.setDressing.isEmpty
@@ -224,37 +229,39 @@ struct BreakdownExporter {
 
     private static func drawTwoUp(
         row: Int, rowTops: [CGFloat], rowHeights: [CGFloat], margin: CGFloat, contentWidth: CGFloat,
-        a: (String, String, NSColor), b: (String, String, NSColor)
+        a: (String, String, NSColor), b: (String, String, NSColor),
+        labelSize: CGFloat = 10.0
     ) {
         let halfCol = contentWidth / 2
         var x = margin
         let h = rowHeights[row]
         let y = rowTops[row] - h
-        drawCell(label: a.0, value: a.1, rect: CGRect(x: x, y: y, width: halfCol, height: h), labelColor: a.2)
+        drawCell(label: a.0, value: a.1, rect: CGRect(x: x, y: y, width: halfCol, height: h), labelColor: a.2, labelSize: labelSize)
         x += halfCol
-        drawCell(label: b.0, value: b.1, rect: CGRect(x: x, y: y, width: contentWidth - halfCol, height: h), labelColor: b.2)
+        drawCell(label: b.0, value: b.1, rect: CGRect(x: x, y: y, width: contentWidth - halfCol, height: h), labelColor: b.2, labelSize: labelSize)
     }
 
     private static func drawThreeUp(
         row: Int, rowTops: [CGFloat], rowHeights: [CGFloat], margin: CGFloat, contentWidth: CGFloat,
-        a: (String, String, NSColor), b: (String, String, NSColor), c: (String, String, NSColor)
+        a: (String, String, NSColor), b: (String, String, NSColor), c: (String, String, NSColor),
+        labelSize: CGFloat = 10.0
     ) {
         let thirdCol = contentWidth / 3
         var x = margin
         let h = rowHeights[row]
         let y = rowTops[row] - h
-        drawCell(label: a.0, value: a.1, rect: CGRect(x: x, y: y, width: thirdCol, height: h), labelColor: a.2)
+        drawCell(label: a.0, value: a.1, rect: CGRect(x: x, y: y, width: thirdCol, height: h), labelColor: a.2, labelSize: labelSize)
         x += thirdCol
-        drawCell(label: b.0, value: b.1, rect: CGRect(x: x, y: y, width: thirdCol, height: h), labelColor: b.2)
+        drawCell(label: b.0, value: b.1, rect: CGRect(x: x, y: y, width: thirdCol, height: h), labelColor: b.2, labelSize: labelSize)
         x += thirdCol
-        drawCell(label: c.0, value: c.1, rect: CGRect(x: x, y: y, width: contentWidth - 2 * thirdCol, height: h), labelColor: c.2)
+        drawCell(label: c.0, value: c.1, rect: CGRect(x: x, y: y, width: contentWidth - 2 * thirdCol, height: h), labelColor: c.2, labelSize: labelSize)
     }
 
     /// Draws one bordered cell with colored department header and dynamic auto-scaling text.
     private static func drawCell(
         label: String, value: String, rect: CGRect,
-        valueSize: CGFloat = 10.5, valueBold: Bool = false, centered: Bool = false,
-        labelColor: NSColor = defaultColor
+        valueSize: CGFloat = 9.0, valueBold: Bool = false, centered: Bool = false,
+        labelColor: NSColor = defaultColor, labelSize: CGFloat = 10.0
     ) {
         NSColor.black.setStroke()
         let border = NSBezierPath(rect: rect)
@@ -269,12 +276,21 @@ struct BreakdownExporter {
         var textTop = rect.maxY - padV
 
         if !label.isEmpty {
+            let labelStyle = NSMutableParagraphStyle()
+            labelStyle.lineBreakMode = .byWordWrapping
+            labelStyle.alignment = centered ? .center : .left
+
             let labelAttr = NSAttributedString(string: label, attributes: [
-                .font: NSFont.boldSystemFont(ofSize: 8.8),
-                .foregroundColor: labelColor
+                .font: NSFont.boldSystemFont(ofSize: labelSize),
+                .foregroundColor: labelColor,
+                .paragraphStyle: labelStyle
             ])
-            labelAttr.draw(at: CGPoint(x: rect.minX + padH, y: textTop - 10))
-            textTop -= 14
+            
+            let labelAvailWidth = max(rect.width - 2 * padH, 1)
+            let labelHeight = labelSize + 5
+            let labelRect = CGRect(x: rect.minX + padH, y: textTop - labelHeight, width: labelAvailWidth, height: labelHeight)
+            labelAttr.draw(in: labelRect)
+            textTop -= (labelHeight + 3)
         }
 
         let cleanValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
