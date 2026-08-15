@@ -12,18 +12,24 @@ struct ProductionSetupSheet: View {
     /// caller can propagate the rename into every scene's cast list and existing call sheets.
     var onCharacterRenamed: (String, String) -> Void = { _, _ in }
 
-    @State private var companyName:   String = ""
-    @State private var directorName:  String = ""
-    @State private var contactNumber: String = ""
-    @State private var castList:      [CastMember] = []
-    @State private var crew:          [CrewMember] = []
-    @State private var locationRoster: [Location] = []
+    @State private var companyName:      String = ""
+    @State private var directorName:     String = ""
+    @State private var directorPhone:    String = ""
+    @State private var producerName:     String = ""
+    @State private var producerPhone:    String = ""
+    @State private var adName:           String = ""
+    @State private var adPhone:          String = ""
+    @State private var defaultLunchTime: String = "01:30 PM"
+    @State private var castList:         [CastMember] = []
+    @State private var crew:             [CrewMember] = []
+    @State private var locationRoster:   [Location] = []
 
     @State private var newActorName:          String = ""
     @State private var availabilityEditorIndex: Int? = nil
     @State private var newCharacterName:      String = ""
     @State private var newCrewName:           String = ""
     @State private var newCrewRole:           String = ""
+    @State private var newCrewPhone:          String = ""
     @State private var newCrewIsDailyDefault: Bool   = false
     @State private var newLocationName:    String = ""
     @State private var newLocationAddress: String = ""
@@ -58,8 +64,41 @@ struct ProductionSetupSheet: View {
                     Group {
                         Label("Production Details", systemImage: "building.2").font(.headline)
                         LabeledField("Production Company", placeholder: "e.g. Tempel Films", text: $companyName)
-                        LabeledField("Director",           placeholder: "e.g. Chris Tempel",  text: $directorName)
-                        LabeledField("Contact Number",     placeholder: "e.g. 555-867-5309",  text: $contactNumber)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Director").font(.subheadline).foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                TextField("Director name", text: $directorName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                TextField("Phone", text: $directorPhone)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .frame(maxWidth: 180)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Producer").font(.subheadline).foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                TextField("Producer name", text: $producerName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                TextField("Phone", text: $producerPhone)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .frame(maxWidth: 180)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("1st AD (Assistant Director)").font(.subheadline).foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                TextField("1st AD name", text: $adName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                TextField("Phone", text: $adPhone)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .frame(maxWidth: 180)
+                            }
+                        }
+
+                        LabeledField("Default Lunch Time", placeholder: "e.g. 01:30 PM", text: $defaultLunchTime)
                     }
 
                     Divider()
@@ -145,14 +184,20 @@ struct ProductionSetupSheet: View {
 
                     // Crew list
                     Label("Crew", systemImage: "person.3").font(.headline)
-                    Text("Check \"Daily\" for crew expected on set every day — they'll be pre-populated on each call sheet. Specialty crew can be added per-day when building call sheets.")
+                    Text("Check \"Daily\" for crew expected on set every day — they'll be pre-populated on each call sheet with their function and phone number.")
                         .font(.caption).foregroundColor(.secondary)
 
                     // Column header
                     HStack {
-                        Text("Name / Role")
+                        Text("Name")
                             .font(.caption).foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Role / Function")
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(maxWidth: 120, alignment: .leading)
+                        Text("Phone")
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(maxWidth: 110, alignment: .leading)
                         Text("Daily")
                             .font(.caption).foregroundColor(.secondary)
                             .frame(width: 44, alignment: .center)
@@ -164,7 +209,7 @@ struct ProductionSetupSheet: View {
                         Text("No crew added yet.").font(.caption).foregroundColor(.secondary)
                     } else {
                         ForEach(Array(crew.enumerated()), id: \.element.id) { index, member in
-                            HStack {
+                            HStack(spacing: 6) {
                                 TextField("Name", text: Binding(
                                     get: { crew[index].name },
                                     set: { crew[index].name = $0 }
@@ -177,6 +222,13 @@ struct ProductionSetupSheet: View {
                                 ))
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .frame(maxWidth: 120)
+
+                                TextField("Phone", text: Binding(
+                                    get: { crew[index].phone },
+                                    set: { crew[index].phone = $0 }
+                                ))
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .frame(maxWidth: 110)
 
                                 Toggle("", isOn: Binding(
                                     get: { crew[index].isDailyDefault },
@@ -200,12 +252,15 @@ struct ProductionSetupSheet: View {
                     }
 
                     // Add crew member
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         TextField("Name", text: $newCrewName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         TextField("Role (e.g. DP)", text: $newCrewRole)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .frame(maxWidth: 140)
+                            .frame(maxWidth: 120)
+                        TextField("Phone", text: $newCrewPhone)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(maxWidth: 110)
                         Toggle("Daily", isOn: $newCrewIsDailyDefault)
                             .toggleStyle(.checkbox)
                             .help("Pre-populate on every call sheet")
@@ -215,10 +270,12 @@ struct ProductionSetupSheet: View {
                             crew.append(CrewMember(
                                 name:           name,
                                 role:           newCrewRole.trimmingCharacters(in: .whitespaces),
+                                phone:          newCrewPhone.trimmingCharacters(in: .whitespaces),
                                 isDailyDefault: newCrewIsDailyDefault
                             ))
                             newCrewName           = ""
                             newCrewRole           = ""
+                            newCrewPhone          = ""
                             newCrewIsDailyDefault = false
                         } label: {
                             Image(systemName: "plus.circle.fill").foregroundColor(.blue).font(.title3)
@@ -263,7 +320,7 @@ struct ProductionSetupSheet: View {
                     }
 
                     HStack(spacing: 8) {
-                        TextField("Name", text: $newLocationName)
+                        TextField("Location name", text: $newLocationName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         TextField("Address (optional)", text: $newLocationAddress)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -288,9 +345,6 @@ struct ProductionSetupSheet: View {
                 Button("Cancel") { isPresented = false }.buttonStyle(.bordered)
                 Spacer()
                 Button("Save") {
-                    // Detect character renames (same cast member, different character text) by
-                    // matching against the *old* list — still intact in the binding at this
-                    // point, since we haven't overwritten it yet — before applying the edits.
                     let oldByID = Dictionary(uniqueKeysWithValues: productionInfo.castList.map { ($0.id, $0) })
                     for member in castList {
                         if let old = oldByID[member.id],
@@ -301,12 +355,17 @@ struct ProductionSetupSheet: View {
                         }
                     }
 
-                    productionInfo.companyName   = companyName
-                    productionInfo.directorName  = directorName
-                    productionInfo.contactNumber = contactNumber
-                    productionInfo.castList      = castList
-                    productionInfo.crew          = crew
-                    productionInfo.locationRoster = locationRoster
+                    productionInfo.companyName      = companyName
+                    productionInfo.directorName     = directorName
+                    productionInfo.directorPhone    = directorPhone
+                    productionInfo.producerName     = producerName
+                    productionInfo.producerPhone    = producerPhone
+                    productionInfo.adName           = adName
+                    productionInfo.adPhone          = adPhone
+                    productionInfo.defaultLunchTime = defaultLunchTime
+                    productionInfo.castList         = castList
+                    productionInfo.crew             = crew
+                    productionInfo.locationRoster   = locationRoster
                     onSave()
                     isPresented = false
                 }
@@ -314,14 +373,19 @@ struct ProductionSetupSheet: View {
             }
             .padding(24)
         }
-        .frame(width: 580, height: 700)
+        .frame(width: 620, height: 720)
         .onAppear {
-            companyName   = productionInfo.companyName
-            directorName  = productionInfo.directorName
-            contactNumber = productionInfo.contactNumber
-            castList      = productionInfo.castList
-            crew          = productionInfo.crew
-            locationRoster = productionInfo.locationRoster
+            companyName      = productionInfo.companyName
+            directorName     = productionInfo.directorName
+            directorPhone    = productionInfo.directorPhone
+            producerName     = productionInfo.producerName
+            producerPhone    = productionInfo.producerPhone
+            adName           = productionInfo.adName
+            adPhone          = productionInfo.adPhone
+            defaultLunchTime = productionInfo.defaultLunchTime
+            castList         = productionInfo.castList
+            crew             = productionInfo.crew
+            locationRoster   = productionInfo.locationRoster
         }
     }
 }

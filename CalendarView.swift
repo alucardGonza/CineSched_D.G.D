@@ -8,6 +8,7 @@ import AppKit
 // MARK: - CompactMonthCalendarView
 
 struct CompactMonthCalendarView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var shootDays: [ShootDay]
     let assignScene:  (Scene, ShootDay) -> Void
     @Binding var allScenes: [Scene]
@@ -20,6 +21,7 @@ struct CompactMonthCalendarView: View {
     @Binding var lastSelectedSceneID: UUID?
     let conflictDates: Set<Date>
     let conflictSceneIDs: Set<UUID>
+    let duplicateSceneNumberIDs: Set<UUID>
     let scheduleLockChangedDates: Set<Date>
     @Binding var scrollToDate: Date?
     /// Called immediately before a structural mutation (drag/drop, remove, duplicate,
@@ -67,7 +69,7 @@ struct CompactMonthCalendarView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 60)   // extra breathing room so the last row's totals are never flush with the scroll edge
             }
-            .onChange(of: scrollToDate) { _, newValue in
+            .onChange(of: scrollToDate) { newValue in
                 guard let date = newValue else { return }
                 if let target = shootDays.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
                     withAnimation { proxy.scrollTo(target.id, anchor: .top) }
@@ -98,12 +100,14 @@ struct CompactMonthCalendarView: View {
                 onCancel: { showingSendToDaySheet = false }
             )
         }
-        .onChange(of: showingEditSheet) { _, isShowing in
+        .onChange(of: showingEditSheet) { isShowing in
             if !isShowing { clearEditingState() }
         }
     }
 
     // MARK: - Day Cell
+
+    private var dayNumbers: [UUID: Int] { productionDayNumbers(for: shootDays) }
 
     @ViewBuilder
     private func dayCell(day: ShootDay, dayIndex: Int) -> some View {
@@ -159,6 +163,14 @@ struct CompactMonthCalendarView: View {
                                 .help("An actor's working days changed here since the schedule was locked — see Production > Schedule Lock Report…")
                         }
                         Spacer()
+                        if !day.callSheet.lunchTime.isEmpty {
+                            Text("🍽️ \(day.callSheet.lunchTime)")
+                                .font(.caption2).foregroundColor(.secondary)
+                        }
+                        if let dayNumber = dayNumbers[day.id] {
+                            Text("Day \(dayNumber)")
+                                .font(.caption2).fontWeight(.semibold).foregroundColor(.secondary)
+                        }
                         Image(systemName: "doc.text")
                             .font(.system(size: 8))
                             .foregroundColor(.secondary)
@@ -194,6 +206,7 @@ struct CompactMonthCalendarView: View {
                             selectionCount: selectedSceneIDs.count,
                             showCast: isSidebarCollapsed,
                             hasConflict: conflictSceneIDs.contains(scene.id),
+                            hasDuplicateSceneNumber: duplicateSceneNumberIDs.contains(scene.id),
                             isOnBlackoutDay: day.isBlackout,
                             onEdit:      { editScene(dayIndex: dayIndex, sceneIndex: sceneIndex, scene: scene, dayId: day.id) },
                             onRemove:    { removeFromDay(scene, dayId: day.id) },
@@ -232,7 +245,16 @@ struct CompactMonthCalendarView: View {
         }
         .padding(6)
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-        .background(day.isBlackout ? Color.red.opacity(0.16) : Color.gray.opacity(0.32))
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(
+                    day.isBlackout
+                        ? Color.red.opacity(0.16)
+                        : (isWeekend(day.date)
+                            ? Color(NSColor.controlBackgroundColor).opacity(colorScheme == .dark ? 0.82 : 0.92)
+                            : Color(NSColor.controlBackgroundColor))
+                )
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(
@@ -278,7 +300,9 @@ struct CompactMonthCalendarView: View {
                 },
                 onExportPDF: { exportDay in
                     onCallSheetExport(exportDay)
-                }
+                },
+                dayNumber: dayNumbers[day.id],
+                totalProductionDays: dayNumbers.values.max() ?? 0
             )
         }
     }
@@ -310,7 +334,8 @@ struct CompactMonthCalendarView: View {
                 canGoNext: sceneIndex < shootDays[dayIndex].scenes.count - 1,
                 onPrevious: { editingSceneIndex = sceneIndex - 1 },
                 onNext: { editingSceneIndex = sceneIndex + 1 },
-                positionLabel: "Scene \(sceneIndex + 1) of \(shootDays[dayIndex].scenes.count)"
+                positionLabel: "Scene \(sceneIndex + 1) of \(shootDays[dayIndex].scenes.count)",
+                knownLocations: allProjectLocations
             )
         } else {
             VStack(spacing: 20) {
@@ -332,6 +357,22 @@ struct CompactMonthCalendarView: View {
 
     private func shouldShowDropIndicator(dayId: UUID, position: Int) -> Bool {
         dropTargetDayId == dayId && dropTargetPosition == position
+    }
+
+    private var allProjectLocations: [String] {
+        var set = Set<String>()
+        for d in shootDays {
+            for s in d.scenes where !s.realLocation.isEmpty {
+                set.insert(s.realLocation)
+            }
+        }
+        for s in allScenes where !s.realLocation.isEmpty {
+            set.insert(s.realLocation)
+        }
+        for loc in productionInfo.locationRoster where !loc.name.isEmpty {
+            set.insert(loc.name)
+        }
+        return Array(set).sorted()
     }
 
     /// Accepts either a single scene ID or a comma-separated list of scene IDs (dragged
@@ -447,9 +488,6 @@ struct CompactMonthCalendarView: View {
 
     // MARK: - Send to Day
 
-    /// Right-clicking a scene that's part of the current multi-selection sends the whole
-    /// selection; right-clicking a scene outside the selection sends just that one, mirroring
-    /// the same "act on the selection, or act on what you clicked" rule the Boneyard drag uses.
     /// Every currently selected scene ID, ordered sensibly — scheduled ones by their
     /// existing calendar position, then any still-unscheduled selected ones from the
     /// Boneyard — or just [scene.id] if scene isn't part of a multi-selection. Shared by
@@ -478,7 +516,7 @@ struct CompactMonthCalendarView: View {
         showingSendToDaySheet = true
     }
 
-    /// Moves the given scenes (from the Boneyard or any day) to the end of the target day,
+    /// Moves every scene in `ids` into `targetDayId`, appending them to the end while
     /// preserving the order they're passed in, and clears them from the selection afterward.
     private func sendScenes(_ ids: [UUID], toDay targetDayId: UUID) {
         guard let targetIdx = shootDays.firstIndex(where: { $0.id == targetDayId }) else { return }
@@ -486,16 +524,21 @@ struct CompactMonthCalendarView: View {
         var insertPosition = shootDays[targetIdx].scenes.count
 
         for uuid in ids {
+            // From Boneyard
             if let idx = allScenes.firstIndex(where: { $0.id == uuid }) {
                 let scene = allScenes.remove(at: idx)
                 insertSceneIntoDay(scene: scene, dayId: targetDayId, position: insertPosition)
                 insertPosition += 1
                 continue
             }
+
+            // From another (or same) day
             for dayIdx in shootDays.indices {
                 if let sceneIdx = shootDays[dayIdx].scenes.firstIndex(where: { $0.id == uuid }) {
                     let scene = shootDays[dayIdx].scenes.remove(at: sceneIdx)
-                    insertSceneIntoDay(scene: scene, dayId: targetDayId, position: insertPosition)
+                    var adjustedPos = insertPosition
+                    if shootDays[dayIdx].id == targetDayId && sceneIdx < insertPosition { adjustedPos -= 1 }
+                    insertSceneIntoDay(scene: scene, dayId: targetDayId, position: adjustedPos)
                     insertPosition += 1
                     break
                 }
@@ -510,6 +553,7 @@ struct CompactMonthCalendarView: View {
         onBeforeSceneChange()
         allScenes.append(Scene(
             title: scene.title + " (Copy)",
+            sceneNumber: scene.sceneNumber,
             duration: scene.duration,
             estimatedTime: scene.estimatedTime,
             dayNightType: scene.dayNightType,
@@ -588,6 +632,7 @@ struct SceneCardView: View {
     let selectionCount: Int
     let showCast:       Bool
     let hasConflict:    Bool
+    let hasDuplicateSceneNumber: Bool
     let isOnBlackoutDay: Bool
     let onEdit:      () -> Void
     let onRemove:    () -> Void
@@ -615,7 +660,7 @@ struct SceneCardView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 3) {
-                    Text(scene.title)
+                    Text(scene.displayTitle)
                         .font(.caption2).fontWeight(.medium).lineLimit(2)
                     if hasConflict {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -629,14 +674,18 @@ struct SceneCardView: View {
                             .foregroundColor(.red)
                             .help("Scheduled on a day marked unavailable")
                     }
+                    if hasDuplicateSceneNumber {
+                        Image(systemName: "number.square.fill")
+                            .font(.system(size: 7))
+                            .foregroundColor(.red)
+                            .help("Duplicate scene number '\(scene.sceneNumber)' — another scene uses it too.")
+                    }
                 }
 
                 Text("(\(formattedEighths(scene.duration)), \(formattedTime(scene.estimatedTime)))")
                     .font(.caption2).foregroundColor(.secondary)
 
-                // Cast only shows when the sidebar is collapsed — with the sidebar open there's
-                // not enough width for it to read cleanly, and it's left off the PDF entirely
-                // since PDFExporter never draws it.
+                // Cast only shows when the sidebar is collapsed
                 if showCast, !scene.cast.isEmpty {
                     Text(scene.cast.joined(separator: ", "))
                         .font(.caption2).foregroundColor(.secondary).italic()
@@ -659,6 +708,11 @@ struct SceneCardView: View {
                         )
                 )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(Color.red, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                .opacity(hasDuplicateSceneNumber ? 1 : 0)
+        )
         .scaleEffect(isDragging ? 1.05 : 1.0)
         .opacity(isDragging ? 0.8 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isDragging)
@@ -670,7 +724,7 @@ struct SceneCardView: View {
         } preview: {
             HStack(spacing: 4) {
                 Circle().fill(scene.dayNightType.color).frame(width: 8, height: 8)
-                Text(scene.title).font(.caption).fontWeight(.medium)
+                Text(scene.displayTitle).font(.caption).fontWeight(.medium)
             }
             .padding(8)
             .background(
@@ -694,7 +748,7 @@ struct SceneCardView: View {
                 interactingSceneId = nil; onSendToDay()
             }
         }
-        .onChange(of: isDragging) { _, dragging in
+        .onChange(of: isDragging) { dragging in
             if !dragging { onDragEnd() }
         }
     }
@@ -767,9 +821,6 @@ struct CombinedDayDropDelegate: DropDelegate {
     }
 
     func dropEntered(info: DropInfo) {
-        // Peek at the identifier to decide which highlight to show
-        // We can't read the value synchronously, so we show day highlight
-        // if draggingDayId is set, scene highlight otherwise
         if draggingDayId != nil {
             dayDropTargetId = dayId
         } else if scenes.isEmpty {

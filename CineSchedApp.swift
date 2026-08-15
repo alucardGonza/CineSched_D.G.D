@@ -86,6 +86,10 @@ struct CineSchedApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
 
+                Button("Export Strip Schedule to PDF…") {
+                    NotificationCenter.default.post(name: .csExportStripboardPDF, object: nil)
+                }
+
                 Button("Export Days Out of Days…") {
                     NotificationCenter.default.post(name: .csExportDaysOutOfDays, object: nil)
                 }
@@ -133,7 +137,7 @@ struct CineSchedApp: App {
                 }
             }
 
-            // View menu — Dark Mode, alongside the automatic Toggle Sidebar item
+            // View menu — Dark Mode
             CommandGroup(after: .toolbar) {
                 Divider()
                 Toggle("Dark Mode", isOn: $isDarkMode)

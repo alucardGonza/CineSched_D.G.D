@@ -23,13 +23,17 @@ struct SceneEditSheet: View {
     /// for the Breakdown Browser, where closing on every delete would kick you out of a
     /// script you might be halfway through tagging, forcing a restart from scene one.
     var closeAfterDelete: Bool = true
+    var knownLocations: [String] = []
 
-    @State private var editTitle:         String      = ""
-    @State private var editDuration:      String      = ""
-    @State private var editEstimatedTime: String      = ""
-    @State private var editDayNightType:  DayNightType = .day
-    @State private var editCastText:      String      = ""   // comma-separated editing surface
-    @State private var editSummary:       String      = ""
+    @State private var editSceneNumber:     String      = ""
+    @State private var editTitle:           String      = ""
+    @State private var editRealLocation:    String      = ""
+    @State private var editLocationAddress: String      = ""
+    @State private var editDuration:        String      = ""
+    @State private var editEstimatedTime:   String      = ""
+    @State private var editDayNightType:    DayNightType = .day
+    @State private var editCastText:        String      = ""   // comma-separated editing surface
+    @State private var editSummary:         String      = ""
 
     @State private var breakdownExpanded:      Bool   = true
     @State private var editExtras:             String = ""
@@ -94,11 +98,29 @@ struct SceneEditSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
 
-                // Title
-                Text("Scene Title").font(.headline)
-                TextField("Scene Title", text: $editTitle)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .focused($focusedField, equals: .title)
+                // Scene Number & Title
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Scene #").font(.headline)
+                        TextField("#", text: $editSceneNumber)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 80)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Scene Title").font(.headline)
+                        TextField("Scene Title", text: $editTitle)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .focused($focusedField, equals: .title)
+                    }
+                }
+
+                // Real Location (Set) with Autocomplete
+                LocationAutocompleteField(
+                    title: "Real Location / Set",
+                    placeholder: "e.g. Playa de la Concha, Airport Hangar",
+                    text: $editRealLocation,
+                    suggestions: knownLocations
+                )
 
                 // Duration
                 VStack(alignment: .leading, spacing: 4) {
@@ -110,7 +132,7 @@ struct SceneEditSheet: View {
                     )
                     .frame(height: 22)
                     .border(durationIsValid ? Color.clear : Color.red, width: 1)
-                    .onChange(of: editDuration) { validateDuration() }
+                    .onChange(of: editDuration) { _ in validateDuration() }
 
                     if !durationIsValid {
                         Text("Invalid format. Use: 15 (eighths), 1 7/8 (mixed), or 7/8 (fraction)")
@@ -131,7 +153,7 @@ struct SceneEditSheet: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .focused($focusedField, equals: .estimate)
                         .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
-                        .onChange(of: editEstimatedTime) { validateEstimatedTime() }
+                        .onChange(of: editEstimatedTime) { _ in validateEstimatedTime() }
 
                     if !estimatedTimeIsValid {
                         Text("Invalid format. Use: 4 (4 hours), 15 (15 minutes), or 2:30 (2hr 30min)")
@@ -167,7 +189,7 @@ struct SceneEditSheet: View {
                 // Day / Night / Custom
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Type").font(.headline)
-                    HStack(spacing: 16) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                         ForEach(DayNightType.allCases, id: \.self) { type in
                             Button {
                                 editDayNightType = type
@@ -249,7 +271,7 @@ struct SceneEditSheet: View {
             focusDurationField()
             breakdownExpanded = breakdownExpandedByDefault
         }
-        .onChange(of: scene.id) {
+        .onChange(of: scene.id) { _ in
             populateFields()
             focusDurationField()
             breakdownExpanded = breakdownExpandedByDefault
@@ -260,11 +282,7 @@ struct SceneEditSheet: View {
 
     /// Duration is the field users almost always need to correct — even on imported
     /// scenes where every field already has a default value — so focus starts there
-    /// instead of landing on whatever the first empty field happens to be. Using
-    /// SelectAllTextField also means the existing value is selected, so typing
-    /// immediately replaces it rather than requiring a manual select/delete first.
-    /// The dispatch is needed because on macOS a same-frame focus assignment in a
-    /// freshly-presented sheet is often dropped.
+    /// instead of landing on whatever the first empty field happens to be.
     private func focusDurationField() {
         DispatchQueue.main.async {
             focusDurationTrigger = true
@@ -280,12 +298,15 @@ struct SceneEditSheet: View {
     }
 
     private func populateFields() {
-        editTitle         = scene.title
-        editDuration      = scene.duration > 0 ? FractionParser.formatEighths(scene.duration) : ""
-        editEstimatedTime = scene.estimatedTime > 0 ? formatMinutesForEditing(scene.estimatedTime) : ""
-        editDayNightType  = scene.dayNightType
-        editCastText      = scene.cast.joined(separator: ", ")
-        editSummary       = scene.summary
+        editSceneNumber      = scene.sceneNumber
+        editTitle            = scene.title
+        editRealLocation     = scene.realLocation
+        editLocationAddress  = scene.locationAddress
+        editDuration         = scene.duration > 0 ? FractionParser.formatEighths(scene.duration) : ""
+        editEstimatedTime    = scene.estimatedTime > 0 ? formatMinutesForEditing(scene.estimatedTime) : ""
+        editDayNightType     = scene.dayNightType
+        editCastText         = scene.cast.joined(separator: ", ")
+        editSummary          = scene.summary
         editExtras           = scene.extras.joined(separator: ", ")
         editProps            = scene.props.joined(separator: ", ")
         editSetDressing      = scene.setDressing.joined(separator: ", ")
@@ -320,23 +341,20 @@ struct SceneEditSheet: View {
 
     private func isValidInput() -> Bool {
         let titleOK = !editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if editDayNightType == .custom {
-            // Custom strips only require a title
-            return titleOK && durationIsValid && estimatedTimeIsValid
-        }
-        let durationOK = (FractionParser.parseToEighths(editDuration) ?? 0) > 0
-        let timeOK     = (TimeParser.parseToMinutes(editEstimatedTime) ?? 0) > 0
-        return titleOK && durationOK && timeOK
+        return titleOK && durationIsValid && estimatedTimeIsValid
     }
 
     private func saveChanges() {
-        scene.title        = editTitle
-        scene.dayNightType = editDayNightType
-        scene.cast         = editCastText
+        scene.sceneNumber     = editSceneNumber.trimmingCharacters(in: .whitespaces)
+        scene.title           = editTitle
+        scene.realLocation    = editRealLocation.trimmingCharacters(in: .whitespaces)
+        scene.locationAddress = editLocationAddress.trimmingCharacters(in: .whitespaces)
+        scene.dayNightType    = editDayNightType
+        scene.cast            = editCastText
             .components(separatedBy: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        scene.summary      = editSummary
+        scene.summary         = editSummary
         if let d = FractionParser.parseToEighths(editDuration) { scene.duration      = d }
         else if editDayNightType == .custom                     { scene.duration      = 0 }
         if let t = TimeParser.parseToMinutes(editEstimatedTime) { scene.estimatedTime = t }

@@ -1,59 +1,75 @@
 // NewSceneInputView.swift
-// Sidebar form for manually creating and adding a new scene to the Boneyard
+// Form for creating a new Scene in the Boneyard sidebar
 
 import SwiftUI
 
 struct NewSceneInputView: View {
+    @Binding var newSceneNumber: String
     @Binding var newSceneTitle: String
     @Binding var newDuration:   String
     @Binding var newEstimate:   String
+    @Binding var newDayNightType: DayNightType
     @Binding var allScenes:     [Scene]
-    let onSceneAdded: () -> Void
 
-    @State private var durationIsValid:      Bool         = true
-    @State private var estimatedTimeIsValid: Bool         = true
-    @State private var newDayNightType:      DayNightType = .day
+    @State private var newRealLocation:      String = ""
+    @State private var durationIsValid:      Bool = true
+    @State private var estimatedTimeIsValid: Bool = true
+
+    var knownLocations: [String] {
+        Array(Set(allScenes.map { $0.realLocation }.filter { !$0.isEmpty })).sorted()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Scene Title", text: $newSceneTitle)
+            HStack(spacing: 6) {
+                TextField("#", text: $newSceneNumber)
+                    .frame(width: 60)
+                    .help("Scene number (optional)")
+                TextField("Scene Title", text: $newSceneTitle)
+            }
 
-            // Duration field — optional for Custom strips
+            // Real Location with Autocomplete
+            LocationAutocompleteField(
+                title: "Real Location / Set",
+                placeholder: "e.g. Playa de la Concha",
+                text: $newRealLocation,
+                suggestions: knownLocations
+            )
+
+            // Duration field — optional for Custom strips / notice strips
             VStack(alignment: .leading, spacing: 4) {
-                TextField(FractionParser.placeholderText, text: $newDuration)
-                    .border(durationIsValid ? Color.clear : Color.red, width: 1)
-                    .onChange(of: newDuration) { validateDuration() }
+                TextField("Page Count (e.g. 1 4/8)", text: $newDuration)
+                    .onChange(of: newDuration) { _ in validateInputs() }
 
-                if !durationIsValid && !newDuration.isEmpty {
-                    Text("Invalid format")
+                if !durationIsValid {
+                    Text("Invalid page format. Use: 15, 1 7/8, 7/8")
                         .font(.caption).foregroundColor(.red)
                 } else if let eighths = FractionParser.parseToEighths(newDuration), !newDuration.isEmpty {
                     Text("= \(FractionParser.formatEighths(eighths)) pages")
                         .font(.caption).foregroundColor(.secondary)
-                } else if newDayNightType == .custom {
+                } else if newDuration.isEmpty {
                     Text("Leave blank for no page count")
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
 
-            // Time field — optional for Custom strips
+            // Estimated time field
             VStack(alignment: .leading, spacing: 4) {
-                TextField(TimeParser.placeholderText, text: $newEstimate)
-                    .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
-                    .onChange(of: newEstimate) { validateEstimatedTime() }
+                TextField("Est. Shoot Time (e.g. 4, 15, 2:30)", text: $newEstimate)
+                    .onChange(of: newEstimate) { _ in validateInputs() }
 
-                if !estimatedTimeIsValid && !newEstimate.isEmpty {
-                    Text("Invalid time format")
+                if !estimatedTimeIsValid {
+                    Text("Invalid time format. Use: 4 (hours), 15 (mins), 2:30")
                         .font(.caption).foregroundColor(.red)
                 } else if let hint = TimeParser.getInputHint(newEstimate), !newEstimate.isEmpty {
                     Text(hint).font(.caption).foregroundColor(.secondary)
-                } else if newDayNightType == .custom {
+                } else if newEstimate.isEmpty {
                     Text("Leave blank for no time estimate")
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
 
-            // Day / Night / Custom toggle
+            // Day / Night / Dawn / Dusk / Afternoon / Custom toggle
             VStack(alignment: .leading, spacing: 4) {
                 Text("Time:").font(.caption).foregroundColor(.secondary)
 
@@ -78,55 +94,48 @@ struct NewSceneInputView: View {
                 }
             }
 
-            Button("Add Scene") { addScene() }
-                .disabled(!canAddScene())
-                .padding(.top, 5)
+            Button("Add Scene") {
+                addScene()
+            }
+            .disabled(!canAddScene())
         }
+        .padding(8)
     }
 
-    // MARK: - Helpers
-
-    private func validateDuration() {
-        durationIsValid = FractionParser.parseToEighths(newDuration) != nil || newDuration.isEmpty
-    }
-
-    private func validateEstimatedTime() {
+    private func validateInputs() {
+        durationIsValid      = FractionParser.parseToEighths(newDuration) != nil || newDuration.isEmpty
         estimatedTimeIsValid = TimeParser.parseToMinutes(newEstimate) != nil || newEstimate.isEmpty
     }
 
+    /// A title is the only thing a scene actually needs — duration and time
+    /// are optional and default to zero when left blank, since a
+    /// notice strip (no scene number, e.g. "DOWN FOR THANKSGIVING") often has
+    /// neither. Non-empty text in either field still has to actually parse.
     private func canAddScene() -> Bool {
         let titleOK = !newSceneTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if newDayNightType == .custom {
-            // Custom strips only require a title
-            return titleOK && durationIsValid && estimatedTimeIsValid
-        }
-        let durationOK = (FractionParser.parseToEighths(newDuration) ?? 0) > 0
-        let timeOK     = (TimeParser.parseToMinutes(newEstimate) ?? 0) > 0
-        return titleOK && durationOK && timeOK
+        return titleOK && durationIsValid && estimatedTimeIsValid
     }
 
     private func addScene() {
-        guard !newSceneTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard canAddScene() else { return }
 
         let duration = FractionParser.parseToEighths(newDuration) ?? 0
         let estimate = TimeParser.parseToMinutes(newEstimate) ?? 0
 
-        // For non-custom types, require valid duration and time
-        if newDayNightType != .custom {
-            guard duration > 0, estimate > 0 else { return }
-        }
-
         allScenes.append(Scene(
             title:         newSceneTitle,
+            sceneNumber:   newSceneNumber.trimmingCharacters(in: .whitespaces),
             duration:      duration,
             estimatedTime: estimate,
-            dayNightType:  newDayNightType
+            dayNightType:  newDayNightType,
+            realLocation:  newRealLocation.trimmingCharacters(in: .whitespaces)
         ))
 
+        newSceneNumber  = ""
         newSceneTitle   = ""
+        newRealLocation = ""
         newDuration     = ""
         newEstimate     = ""
         newDayNightType = .day
-        onSceneAdded()
     }
 }
