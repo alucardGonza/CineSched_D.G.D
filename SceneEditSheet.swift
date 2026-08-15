@@ -167,27 +167,22 @@ struct SceneEditSheet: View {
                 // Day / Night / Custom
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Type").font(.headline)
-                    HStack(spacing: 20) {
+                    HStack(spacing: 16) {
                         ForEach(DayNightType.allCases, id: \.self) { type in
-                            HStack(spacing: 8) {
-                                Button {
-                                    editDayNightType = type
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: editDayNightType == type ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(editDayNightType == type ? type.color : .secondary)
-                                        Text(type == .custom ? "Custom" : type.displayName)
-                                            .foregroundColor(editDayNightType == type ? type.color : .primary)
-                                            .fontWeight(editDayNightType == type ? .semibold : .regular)
-                                    }
+                            Button {
+                                editDayNightType = type
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: editDayNightType == type ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(type.color)
+                                    Text(type == .custom ? "Custom" : type.displayName)
+                                        .foregroundColor(editDayNightType == type ? type.color : .primary)
+                                        .fontWeight(editDayNightType == type ? .semibold : .regular)
+                                        .lineLimit(1)
+                                        .fixedSize(horizontal: true, vertical: false)
                                 }
-                                .buttonStyle(.plain)
-
-                                Circle()
-                                    .fill(type.color)
-                                    .frame(width: 12, height: 12)
-                                    .opacity(editDayNightType == type ? 1.0 : 0.5)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

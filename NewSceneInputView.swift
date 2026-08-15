@@ -54,23 +54,27 @@ struct NewSceneInputView: View {
             }
 
             // Day / Night / Custom toggle
-            HStack(spacing: 15) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Time:").font(.caption).foregroundColor(.secondary)
 
-                ForEach(DayNightType.allCases, id: \.self) { type in
-                    Button {
-                        newDayNightType = type
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: newDayNightType == type ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(newDayNightType == type ? type.color : .secondary)
-                                .font(.caption)
-                            Text(type == .custom ? "Custom" : type.displayName)
-                                .font(.caption)
-                                .foregroundColor(newDayNightType == type ? type.color : .primary)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                    ForEach(DayNightType.allCases, id: \.self) { type in
+                        Button {
+                            newDayNightType = type
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: newDayNightType == type ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(type.color)
+                                    .font(.caption)
+                                Text(type == .custom ? "Custom" : type.displayName)
+                                    .font(.caption)
+                                    .foregroundColor(newDayNightType == type ? type.color : .primary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 

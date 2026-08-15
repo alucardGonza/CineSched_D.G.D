@@ -19,7 +19,7 @@ enum DayNightType: String, Codable, CaseIterable {
         case .night:     return Color.blue
         case .dawn:      return Color(red: 0.96, green: 0.72, blue: 0.18)
         case .dusk:      return Color(red: 0.65, green: 0.35, blue: 0.85)
-        case .afternoon: return Color(red: 0.92, green: 0.48, blue: 0.18)
+        case .afternoon: return Color(red: 0.90, green: 0.25, blue: 0.40)
         case .custom:    return Color.green
         }
     }

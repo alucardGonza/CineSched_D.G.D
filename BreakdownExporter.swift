@@ -1,8 +1,8 @@
 // BreakdownExporter.swift
 // Generates a portrait US Letter PDF with one bordered breakdown-sheet grid per scene —
 // script order, every scene included — in the classic AD breakdown sheet layout.
-// Enhanced with smart dynamic space allocation (shrinking unused categories to 22pt),
-// dynamic font auto-scaling to prevent text clipping, and color-coded department titles.
+// Enhanced with smart dynamic space allocation (shrinking unused categories to 24pt),
+// bulleted list formatting, larger legible typography, and color-coded department titles.
 
 import AppKit
 
@@ -96,20 +96,20 @@ struct BreakdownExporter {
             x += intExtCol
             drawCell(label: "SETTING", value: setting,
                      rect: CGRect(x: x, y: rowTops[1] - rowHeights[1], width: settingCol, height: rowHeights[1]),
-                     valueSize: 10, valueBold: false)
+                     valueSize: 10.5, valueBold: false)
             x += settingCol
             drawCell(label: "LOCATION", value: "",
                      rect: CGRect(x: x, y: rowTops[1] - rowHeights[1], width: locationCol, height: rowHeights[1]),
-                     valueSize: 10)
+                     valueSize: 10.5)
 
-            // Row 2: Description (wide) | Day/Night + Script Pages stacked in right column
+            // Row 2: Description (balanced) | Day/Night + Script Pages stacked in right column
             let rightCol2: CGFloat = 135
             let descCol = contentWidth - rightCol2
             let halfHeight2 = rowHeights[2] / 2
             x = margin
             drawCell(label: "DESCRIPTION", value: scene.summary,
                      rect: CGRect(x: x, y: rowTops[2] - rowHeights[2], width: descCol, height: rowHeights[2]),
-                     valueSize: 9.5)
+                     valueSize: 10.5)
             x += descCol
             drawCell(label: "DAY / NIGHT", value: scene.dayNightType.displayName,
                      rect: CGRect(x: x, y: rowTops[2] - halfHeight2, width: rightCol2, height: halfHeight2),
@@ -120,30 +120,31 @@ struct BreakdownExporter {
 
             // Row 3: Cast | Extras / Background | Wardrobe
             drawThreeUp(row: 3, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
-                        a: ("CAST", scene.cast.joined(separator: ", "), castColor),
-                        b: ("EXTRAS / BACKGROUND", scene.extras.joined(separator: ", "), extrasColor),
-                        c: ("WARDROBE", scene.wardrobe.joined(separator: ", "), wardrobeColor))
+                        a: ("CAST", formatBulletList(scene.cast), castColor),
+                        b: ("EXTRAS / BACKGROUND", formatBulletList(scene.extras), extrasColor),
+                        c: ("WARDROBE", formatBulletList(scene.wardrobe), wardrobeColor))
 
             // Row 4: Hair & Makeup | Props | Set Dressing
             drawThreeUp(row: 4, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
-                        a: ("HAIR & MAKEUP", scene.makeupHair.joined(separator: ", "), hairMakeupColor),
-                        b: ("PROPS", scene.props.joined(separator: ", "), propsColor),
-                        c: ("SET DRESSING", scene.setDressing.joined(separator: ", "), setDressColor))
+                        a: ("HAIR & MAKEUP", formatBulletList(scene.makeupHair), hairMakeupColor),
+                        b: ("PROPS", formatBulletList(scene.props), propsColor),
+                        c: ("SET DRESSING", formatBulletList(scene.setDressing), setDressColor))
 
             // Row 5: Vehicles | Special Equipment | Stunts
             drawThreeUp(row: 5, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
-                        a: ("VEHICLES", scene.vehicles.joined(separator: ", "), vehiclesColor),
-                        b: ("SPECIAL EQUIPMENT", scene.specialEquipment.joined(separator: ", "), specialEqColor),
-                        c: ("STUNTS", scene.stunts.joined(separator: ", "), stuntsColor))
+                        a: ("VEHICLES", formatBulletList(scene.vehicles), vehiclesColor),
+                        b: ("SPECIAL EQUIPMENT", formatBulletList(scene.specialEquipment), specialEqColor),
+                        c: ("STUNTS", formatBulletList(scene.stunts), stuntsColor))
 
             // Row 6: SFX | VFX
             drawTwoUp(row: 6, rowTops: rowTops, rowHeights: rowHeights, margin: margin, contentWidth: contentWidth,
-                      a: ("SFX", scene.sfx.joined(separator: ", "), sfxColor),
-                      b: ("VFX", scene.vfx.joined(separator: ", "), vfxColor))
+                      a: ("SFX", formatBulletList(scene.sfx), sfxColor),
+                      b: ("VFX", formatBulletList(scene.vfx), vfxColor))
 
             // Row 7: Notes (full width)
             drawCell(label: "NOTES", value: scene.breakdownNotes,
                      rect: CGRect(x: margin, y: rowTops[7] - rowHeights[7], width: contentWidth, height: rowHeights[7]),
+                     valueSize: 10.5,
                      labelColor: defaultColor)
 
             // Footer: est. time + scene counter
@@ -163,17 +164,32 @@ struct BreakdownExporter {
         return pdfData as Data
     }
 
+    // MARK: - Bullet List Formatter
+
+    /// Formats an array of items into clean bullet points ("• Item")
+    private static func formatBulletList(_ items: [String]) -> String {
+        let clean = items
+            .flatMap { $0.components(separatedBy: ",") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !clean.isEmpty else { return "" }
+        return clean.map { "• \($0)" }.joined(separator: "\n")
+    }
+
     // MARK: - Dynamic Space Calculation
 
     /// Computes row heights dynamically:
-    /// Unused rows collapse to 22pt, freeing up vertical space for busy rows (Description, Cast, Props, etc.)
+    /// Description has a balanced, controlled height. Unused department rows collapse to 24pt,
+    /// and active department rows receive the freed space proportionally for their bulleted lists.
     private static func computeDynamicRowHeights(for scene: Scene, totalHeight: CGFloat) -> [CGFloat] {
         let fixedRow0: CGFloat = 40 // Sheet # / Title / Scene #
-        let fixedRow1: CGFloat = 46 // INT/EXT / Setting / Location
+        let fixedRow1: CGFloat = 48 // INT/EXT / Setting / Location
         
-        let availableForVariable = totalHeight - fixedRow0 - fixedRow1
+        // Controlled height for Description — ample space without ballooning
+        let fixedRow2: CGFloat = scene.summary.count > 160 ? 90 : 76
         
-        let compactHeight: CGFloat = 22 // Height for empty category rows
+        let availableForDepts = totalHeight - fixedRow0 - fixedRow1 - fixedRow2
+        let compactHeight: CGFloat = 24 // Height for empty category rows
         
         let row3HasContent = !scene.cast.isEmpty || !scene.extras.isEmpty || !scene.wardrobe.isEmpty
         let row4HasContent = !scene.makeupHair.isEmpty || !scene.props.isEmpty || !scene.setDressing.isEmpty
@@ -181,32 +197,27 @@ struct BreakdownExporter {
         let row6HasContent = !scene.sfx.isEmpty || !scene.vfx.isEmpty
         let row7HasContent = !scene.breakdownNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         
-        // Base weights for variable rows (Row 2 to Row 7)
-        // Row 2: Description
-        let w2: CGFloat = scene.summary.count > 120 ? 130 : 95
-        let w3: CGFloat = row3HasContent ? (CGFloat(max(scene.cast.count, max(scene.extras.count, scene.wardrobe.count))) > 3 ? 90 : 70) : compactHeight
-        let w4: CGFloat = row4HasContent ? (CGFloat(max(scene.makeupHair.count, max(scene.props.count, scene.setDressing.count))) > 3 ? 95 : 70) : compactHeight
-        let w5: CGFloat = row5HasContent ? 65 : compactHeight
-        let w6: CGFloat = row6HasContent ? 55 : compactHeight
-        let w7: CGFloat = row7HasContent ? 70 : compactHeight
+        let w3: CGFloat = row3HasContent ? 100 : compactHeight
+        let w4: CGFloat = row4HasContent ? 105 : compactHeight
+        let w5: CGFloat = row5HasContent ? 90  : compactHeight
+        let w6: CGFloat = row6HasContent ? 85  : compactHeight
+        let w7: CGFloat = row7HasContent ? 80  : compactHeight
 
-        let totalWeight = w2 + w3 + w4 + w5 + w6 + w7
-        let scale = availableForVariable / totalWeight
+        let totalWeight = w3 + w4 + w5 + w6 + w7
+        let scale = availableForDepts / totalWeight
         
-        // Scale non-compact rows to consume exact remaining height
-        var r2 = w2 * scale
         let r3 = w3 == compactHeight ? compactHeight : w3 * scale
         let r4 = w4 == compactHeight ? compactHeight : w4 * scale
         let r5 = w5 == compactHeight ? compactHeight : w5 * scale
         let r6 = w6 == compactHeight ? compactHeight : w6 * scale
-        let r7 = w7 == compactHeight ? compactHeight : w7 * scale
+        var r7 = w7 == compactHeight ? compactHeight : w7 * scale
         
-        // Normalize rounding difference on r2 (Description)
-        let currentTotal = fixedRow0 + fixedRow1 + r2 + r3 + r4 + r5 + r6 + r7
+        // Normalize any rounding difference on r7 (or largest active row)
+        let currentTotal = fixedRow0 + fixedRow1 + fixedRow2 + r3 + r4 + r5 + r6 + r7
         let diff = totalHeight - currentTotal
-        r2 += diff
+        r7 += diff
 
-        return [fixedRow0, fixedRow1, r2, r3, r4, r5, r6, r7]
+        return [fixedRow0, fixedRow1, fixedRow2, r3, r4, r5, r6, r7]
     }
 
     // MARK: - Drawing Helpers
@@ -242,7 +253,7 @@ struct BreakdownExporter {
     /// Draws one bordered cell with colored department header and dynamic auto-scaling text.
     private static func drawCell(
         label: String, value: String, rect: CGRect,
-        valueSize: CGFloat = 9.5, valueBold: Bool = false, centered: Bool = false,
+        valueSize: CGFloat = 10.5, valueBold: Bool = false, centered: Bool = false,
         labelColor: NSColor = defaultColor
     ) {
         NSColor.black.setStroke()
@@ -253,17 +264,17 @@ struct BreakdownExporter {
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: rect).addClip()
 
-        let padH: CGFloat = 5
+        let padH: CGFloat = 6
         let padV: CGFloat = 4
         var textTop = rect.maxY - padV
 
         if !label.isEmpty {
             let labelAttr = NSAttributedString(string: label, attributes: [
-                .font: NSFont.boldSystemFont(ofSize: 7.8),
+                .font: NSFont.boldSystemFont(ofSize: 8.8),
                 .foregroundColor: labelColor
             ])
-            labelAttr.draw(at: CGPoint(x: rect.minX + padH, y: textTop - 9))
-            textTop -= 13
+            labelAttr.draw(at: CGPoint(x: rect.minX + padH, y: textTop - 10))
+            textTop -= 14
         }
 
         let cleanValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -271,16 +282,16 @@ struct BreakdownExporter {
             let availWidth  = max(rect.width - 2 * padH, 1)
             let availHeight = max(textTop - rect.minY - padV, 1)
 
-            // Dynamic Font Auto-scaling to guarantee that no text is ever clipped
+            // Dynamic Font Auto-scaling to guarantee that text is large and never clipped
             var currentSize = valueSize
-            let minSize: CGFloat = 6.5
+            let minSize: CGFloat = 7.0
             var finalAttr: NSAttributedString = NSAttributedString()
 
             while currentSize >= minSize {
                 let style = NSMutableParagraphStyle()
                 style.lineBreakMode = .byWordWrapping
                 style.alignment = centered ? .center : .left
-                style.lineSpacing = max(1.0, currentSize * 0.15)
+                style.lineSpacing = max(1.5, currentSize * 0.18)
 
                 let font = valueBold ? NSFont.boldSystemFont(ofSize: currentSize) : NSFont.systemFont(ofSize: currentSize)
                 let attr = NSAttributedString(string: cleanValue, attributes: [
