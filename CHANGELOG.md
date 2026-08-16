@@ -2,6 +2,15 @@
 
 All notable changes to CineSched are documented here.
 
+## [4.5.0] - 2026 (D.G.D Edition)
+### Added
+- **Dynamic Shooting Schedule (Plan de Rodaje) Vector PDF Exporter** — standard vector PDF exporter with 4 bounded columns (Time, Scene and Full Slugline, Script Page, Eighths) with zero text collisions and dynamic milestone badges.
+- **Automated Timeline Cascade & Quick Time Editor** — dynamic hour calculation from call to wrap, dual-mode fixed/cascade selector, duration stepper controls, and double-click time editing directly on stripboard rows.
+- **100% Full Multilingual Localization (Español / English)** — reactive UI translations for all windows, sheets, menus, date formatters, and export reports.
+- **Fixed 7-Column Production Calendar** — uniform Monday-to-Sunday production grid with exact weekday alignment.
+- **Decoupled Calendar Events** — independent non-scene calendar events (travel, rehearsal, rest days) that do not enter the Boneyard or alter scene breakdown statistics.
+- **Notice & Milestone Banners** — customizable banner strips with color presets and dynamic call sheet synchronization.
+
 ## [4.0] - 2026
 ### Added
 - **Call Sheet Reference Redesign** — industry-standard layout in 100% English with clean light gray header, prominent general call time, quote of the day, 12h meal/milestone times (Ready to Shoot, Lunch, Snack, Wrap), nearest hospital, full scene breakdown with clean decorado sluglines, cast call, crew call times, and unified general notes.

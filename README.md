@@ -1,20 +1,46 @@
-# CineSched - Film Production Scheduling App
+# CineSched (D.G.D Fork) - Film Production Scheduling & One-Line Schedule App
 
-A macOS application for scheduling film shoots — visual calendar scheduling, scene breakdown tagging, actor availability and conflict tracking, call sheets, and Final Draft script import, built for productions that need real scheduling tools without the overhead of enterprise software.
+A modern, high-performance macOS application for film and television scheduling — visual calendar scheduling, stripboard timeline cascading, vector shooting schedule (One-Line Schedule) PDF exports, bilingual (Español / English) localization, call sheet management, actor availability & conflict tracking, and script import.
 
 ![Platform](https://img.shields.io/badge/platform-macOS-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.0-orange)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-4.0-green)
-![Version](https://img.shields.io/badge/version-4.0-purple)
+![Version](https://img.shields.io/badge/version-4.5.0-purple)
 ![License](https://img.shields.io/badge/license-GPL--v3-lightgrey)
 
-> **Free for the film community.** Built by a filmmaker, for filmmakers. If you find it useful, the best way to say thanks is to share it. If you're a developer who wants to build a Windows version, [read this](#windows--cross-platform).
+> **CineSched D.G.D Fork**: Enhanced with dynamic timeline cascade, 7-column production calendar, vector shooting schedule PDF generation, pure bilingual localization (Español / English), and independent calendar events.
 
-## Demo
+## ✨ Key Features & New Additions
 
-▶️ [Watch the demo on YouTube](https://youtu.be/UVjkRQHj8JU)
+### 🌐 100% Multilingual Support (Español / English)
+- Instant language switching between **Español** and **English** with reactive UI updates across all views, menus, and sheets.
+- **Locale-aware PDF generation**: Dates, month names, day numbers, banners, and headers format cleanly according to the active language (`Martes, 11 de Agosto de 2026` vs `Tuesday, August 11, 2026`).
+- Native translation of all milestone banners, call sheet fields, and DOOD industry codes.
 
-## Features
+### ⏱️ Dynamic Timeline Cascade & Stripboard Scheduling
+- **Automatic Time Cascading**: Calculates exact start and end times for every scene and banner from call time to wrap time.
+- **Quick Time Editor (Double-Click Time Badge)**: Double-click any time badge on the stripboard to open the dedicated time editor:
+  - 🔘 *Automatic Cascade*: Computes timing naturally according to day order.
+  - 🔘 *Fixed Time Anchor*: Locks specific scenes or meals to fixed clock times (e.g., `11:00 AM` or `01:30 PM`).
+  - *Duration Controls*: Independent Steppers for hours and minutes with real-time preview of the start $\rightarrow$ end range (`11:30 AM ➔ 01:00 PM (1h 30m)`).
+
+### 📑 Vector Plan de Rodaje (Shooting Schedule / One-Line PDF)
+- **High-Resolution Vector PDF Exporter** modeled after international production standards.
+- Clean, uncluttered layout with 4 bounded columns:
+  1. **Horario / Time Badge**: Spacious, high-contrast time badge (`07:30 AM – 07:45 AM`).
+  2. **Escena & Locación Completa / Scene Title**: Full, unobstructed description width without truncated text.
+  3. **Página de Guión / Script Page**: Dedicated column aligned across all rows (`Pág. 1` / `Pg. 1`).
+  4. **Octavos / Eighths**: Right-aligned duration (`6/8 pág` / `6/8 pgs`).
+- **Dynamic Milestones in Header**: Displays Crew Call (`🚌`), Set Call (`🎬`), and Lunch (`🍽️`) synced live with the day's timeline.
+- **End-of-Day Wrap Bar**: Clear summary with exact wrap time, cumulative page counts, and total estimated duration.
+
+### 📅 Fixed 7-Column Production Calendar & Calendar Events
+- **Standard 7-Day Grid**: Fixed Monday-to-Sunday layout respecting standard weekday sequences regardless of window width.
+- **Independent Calendar Events**: Add travel days, rehearsals, scouting, or rest days directly on the calendar. Calendar events are completely isolated from scene counters and never pollute the Boneyard.
+
+### 🚩 Notice Banners & Milestone Strips
+- Add custom company moves, meal breaks, and notice strips into any shoot day.
+- Banner strips feature custom tinting and icons, with dynamic synchronization to call sheets and timelines.
 
 ### 📅 Visual Calendar Scheduling
 - Drag-and-drop scene strips onto calendar days
