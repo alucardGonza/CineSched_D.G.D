@@ -29,6 +29,7 @@ extension Notification.Name {
     static let csLockSchedule         = Notification.Name("CineSched.lockSchedule")
     static let csUnlockSchedule       = Notification.Name("CineSched.unlockSchedule")
     static let csShowScheduleLockReport = Notification.Name("CineSched.showScheduleLockReport")
+    static let csShowColorLegend      = Notification.Name("CineSched.showColorLegend")
     static let csUndo = Notification.Name("CineSched.undo")
     static let csRedo = Notification.Name("CineSched.redo")
 }

@@ -14,6 +14,7 @@ import AppKit
 
 struct StripboardView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
     @Binding var shootDays: [ShootDay]
     @Binding var allScenes: [Scene]
     let productionInfo: ProductionInfo
@@ -117,7 +118,7 @@ struct StripboardView: View {
                 // leaves almost no space to actually drop onto. Production days skip
                 // this entirely — the EndOfDayStrip below takes over that job, so
                 // there's no separate gap revealing the card's background underneath.
-                if dayNumbers[day.id] == nil {
+                if day.scenes.isEmpty {
                     VStack(spacing: 0) {
                         if shouldShowDropIndicator(dayId: day.id, position: day.scenes.count) {
                             DropIndicatorView()
@@ -137,11 +138,12 @@ struct StripboardView: View {
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, minHeight: day.scenes.isEmpty ? 36 : 0, alignment: .topLeading)
 
-            if let dayNumber = dayNumbers[day.id] {
+            if !day.scenes.isEmpty {
+                let dayNum = dayNumbers[day.id] ?? (dayIndex + 1)
                 if shouldShowDropIndicator(dayId: day.id, position: day.scenes.count) {
                     DropIndicatorView()
                 }
-                EndOfDayStrip(day: day, dayNumber: dayNumber)
+                EndOfDayStrip(day: day, dayNumber: dayNum)
                     .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
                         dayId: day.id,
                         position: day.scenes.count,
@@ -153,7 +155,7 @@ struct StripboardView: View {
         }
         .background(
             ZStack {
-                Color.gray.opacity(0.2)
+                currentTheme.panelBackground(isDarkMode: colorScheme == .dark)
                 if isWeekend(day.date) {
                     Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08)
                 }
@@ -216,16 +218,26 @@ struct StripboardView: View {
                             .font(.system(size: 9)).foregroundColor(.red)
                     }
                     if let dayNumber = dayNumbers[day.id] {
-                        Text("Day \(dayNumber)")
+                        Text("\(L("Day")) \(dayNumber)")
                             .font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)
                     }
-                    if !day.callSheet.lunchTime.isEmpty {
-                        Text("🍽️ \(day.callSheet.lunchTime)")
-                            .font(.caption).foregroundColor(.secondary)
+                    HStack(spacing: 6) {
+                        if !day.callSheet.lunchTime.isEmpty {
+                            Text("🍽️ \(day.callSheet.lunchTime)")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        if !day.callSheet.snackTime.isEmpty {
+                            Text("☕ \(day.callSheet.snackTime)")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        if !day.callSheet.dinnerTime.isEmpty {
+                            Text("🎬 \(day.callSheet.dinnerTime)")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
                     }
                     Spacer()
                     if !day.scenes.isEmpty {
-                        Text("\(day.scenes.count) scn · \(formattedEighths(day.totalDuration)) pgs")
+                        Text("\(day.scenes.count) \(L("scn")) · \(formattedEighths(day.totalDuration)) \(L("pgs"))")
                             .font(.caption).foregroundColor(.secondary)
                     }
                     Image(systemName: "doc.text")
@@ -481,26 +493,31 @@ struct StripboardView: View {
 /// edited, or the day itself gets rearranged.
 struct EndOfDayStrip: View {
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var l10n = LocalizationManager.shared
     let day: ShootDay
     let dayNumber: Int
 
-    /// Near-black in both modes, but lightened 10% toward white in light mode
-    /// — pure near-black read as too heavy against a light card background.
-    /// Left alone in dark mode, where it needs to stay the darkest element on
-    /// screen.
     private var backgroundColor: Color {
-        let nearBlack = Color(white: 0.08)
-        return colorScheme == .dark ? nearBlack : nearBlack.lightened(by: 0.1)
+        Color(white: colorScheme == .dark ? 0.28 : 0.72)
+    }
+
+    private var textColor: Color {
+        colorScheme == .dark ? .white : Color(white: 0.18)
+    }
+
+    private var wrapPart: String {
+        let wrap = day.callSheet.dinnerTime.trimmingCharacters(in: .whitespaces)
+        return wrap.isEmpty ? "" : " -- \(L("Wrap:")) \(wrap)"
     }
 
     var body: some View {
-        Text("-- END OF DAY #\(dayNumber) -- \(formattedFullDate(day.date)) -- \(formattedEighths(day.totalDuration)) pgs. -- Estimated time: \(formattedTimeHM(day.totalEstimatedTime))")
+        Text("-- \(L("END OF DAY #"))\(dayNumber) \(formattedFullDate(day.date)) -- \(L("Total Pages:")) \(formattedEighths(day.totalDuration)) -- \(L("Est. Time:")) \(formattedTimeHM(day.totalEstimatedTime))\(wrapPart) --")
             .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundColor(.white)
+            .foregroundColor(textColor)
             .lineLimit(1)
-            .minimumScaleFactor(0.7)
+            .minimumScaleFactor(0.65)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 9)
+            .padding(.vertical, 8)
             .background(backgroundColor)
     }
 }
@@ -583,12 +600,12 @@ struct SceneStripRow: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { interactingSceneId = nil; onEdit() })
         .simultaneousGesture(TapGesture(count: 1).onEnded { interactingSceneId = nil; onSelect() })
         .contextMenu {
-            Button("Edit Scene") { interactingSceneId = nil; onEdit() }
-            Button(isMultiSelected ? "Remove \(selectionCount) Scenes from Day" : "Remove from Day") {
+            Button(L("Edit Scene")) { interactingSceneId = nil; onEdit() }
+            Button(isMultiSelected ? "\(L("Remove")) \(selectionCount) \(L("scenes"))" : L("Remove from Day")) {
                 interactingSceneId = nil; onRemove()
             }
             Divider()
-            Button("Duplicate Scene") { interactingSceneId = nil; onDuplicate() }
+            Button(L("Duplicate Scene")) { interactingSceneId = nil; onDuplicate() }
         }
         .onChange(of: isDragging) { dragging in
             if !dragging { onDragEnd() }

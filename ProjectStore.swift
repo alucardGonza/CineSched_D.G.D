@@ -338,18 +338,19 @@ extension ContentView {
                 case .afternoon:     type = .afternoon
                 case .day, .unknown: type = .day
                 }
-                let duration = 1
+                let duration = max(1, ps.duration)
                 allScenes.append(Scene(
                     title:         ps.location,
                     sceneNumber:   ps.sceneNumber,
                     duration:      duration,
                     estimatedTime: TimeParser.estimatedMinutes(forEighths: duration),
-                    dayNightType:  type
+                    dayNightType:  type,
+                    cast:          ps.cast
                 ))
                 count += 1
             }
             markDirty()
-            importMessage = "Imported \(count) scene\(count == 1 ? "" : "s") from '\(url.lastPathComponent)'.\n\nScenes added to Boneyard with a default 1/8 page count (Final Draft import doesn't compute real page length) and a time estimate extrapolated from that. Edit before scheduling."
+            importMessage = "Imported \(count) scene\(count == 1 ? "" : "s") from '\(url.lastPathComponent)' with automatically calculated page eighths and character lists."
             showingImportAlert = true
         } catch {
             importMessage = "Failed to import script: \(error.localizedDescription)"

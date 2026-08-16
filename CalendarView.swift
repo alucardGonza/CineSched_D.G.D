@@ -114,79 +114,95 @@ struct CompactMonthCalendarView: View {
         VStack(alignment: .leading, spacing: 4) {
 
             // Date header row: grip handle (drag) + date + call sheet indicator
-            HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(draggingDayId == day.id ? .blue : .secondary)
+                        .padding(2)
+                        .contentShape(Rectangle())
+                        .onDrag {
+                            draggingDayId = day.id
+                            return NSItemProvider(object: "day:\(day.id.uuidString)" as NSString)
+                        }
+                        .simultaneousGesture(TapGesture())
+                        .help("Drag to move this day's scenes and call sheet to another date")
 
-                // Grip icon — drag handle for rearranging the day
-                // Uses a draggable view isolated from the button hierarchy
-                // so it responds to click-and-drag without a prior activation click
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(draggingDayId == day.id ? .blue : .secondary)
-                    .padding(4)
-                    .contentShape(Rectangle())
-                    .onDrag {
-                        draggingDayId = day.id
-                        return NSItemProvider(object: "day:\(day.id.uuidString)" as NSString)
+                    Button {
+                        callSheetDay = day
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(formattedDate(day.date))
+                                .font(.caption).bold()
+                                .foregroundColor(day.isBlackout ? .red : .primary)
+                                .lineLimit(1)
+                            if day.isBlackout {
+                                Image(systemName: "nosign")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.red)
+                            }
+                            if day.hasCallSheetData {
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 5, height: 5)
+                            }
+                            if conflictDates.contains(Calendar.current.startOfDay(for: day.date)) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.red)
+                            }
+                            if scheduleLockChangedDates.contains(Calendar.current.startOfDay(for: day.date)) {
+                                Image(systemName: "lock.trianglebadge.exclamationmark.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.purple)
+                            }
+                            Spacer(minLength: 2)
+                            if let dayNumber = dayNumbers[day.id] {
+                                Text("\(L("Day")) \(dayNumber)")
+                                    .font(.caption2).fontWeight(.semibold).foregroundColor(.secondary)
+                            }
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    .simultaneousGesture(TapGesture())   // absorbs tap so parent button doesn't fire
-                    .help("Drag to move this day's scenes and call sheet to another date")
+                    .buttonStyle(.plain)
+                    .help("Click to open call sheet for this day")
+                }
 
-                // Tappable date text — opens call sheet editor
-                Button {
-                    callSheetDay = day
-                } label: {
+                // Sub-row for meal times if present
+                if !day.callSheet.lunchTime.isEmpty || !day.callSheet.snackTime.isEmpty || !day.callSheet.dinnerTime.isEmpty {
                     HStack(spacing: 4) {
-                        Text(formattedDate(day.date))
-                            .font(.caption).bold()
-                            .foregroundColor(day.isBlackout ? .red : .primary)
-                        if day.isBlackout {
-                            Image(systemName: "nosign")
-                                .font(.system(size: 8))
-                                .foregroundColor(.red)
-                                .help("Marked unavailable — scenes can still be scheduled here, but will be flagged")
-                        }
-                        if day.hasCallSheetData {
-                            Circle()
-                                .fill(Color.blue)
-                                .frame(width: 5, height: 5)
-                        }
-                        if conflictDates.contains(Calendar.current.startOfDay(for: day.date)) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 8))
-                                .foregroundColor(.red)
-                                .help("An actor scheduled this day is marked unavailable — see Production > Scan for Conflicts…")
-                        }
-                        if scheduleLockChangedDates.contains(Calendar.current.startOfDay(for: day.date)) {
-                            Image(systemName: "lock.trianglebadge.exclamationmark.fill")
-                                .font(.system(size: 8))
-                                .foregroundColor(.purple)
-                                .help("An actor's working days changed here since the schedule was locked — see Production > Schedule Lock Report…")
-                        }
                         Spacer()
                         if !day.callSheet.lunchTime.isEmpty {
                             Text("🍽️ \(day.callSheet.lunchTime)")
-                                .font(.caption2).foregroundColor(.secondary)
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
-                        if let dayNumber = dayNumbers[day.id] {
-                            Text("Day \(dayNumber)")
-                                .font(.caption2).fontWeight(.semibold).foregroundColor(.secondary)
+                        if !day.callSheet.snackTime.isEmpty {
+                            Text("☕ \(day.callSheet.snackTime)")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 8))
-                            .foregroundColor(.secondary)
+                        if !day.callSheet.dinnerTime.isEmpty {
+                            Text("🎬 \(day.callSheet.dinnerTime)")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
-                .buttonStyle(.plain)
-                .help("Click to open call sheet for this day")
-                .contextMenu {
-                    Button(day.isBlackout ? "Mark as Available" : "Mark as Unavailable") {
-                        toggleBlackout(day)
-                    }
-                    Button(day.isBlackout
-                           ? "Mark All \(weekdayName(for: day.date))s as Available"
-                           : "Mark All \(weekdayName(for: day.date))s as Unavailable") {
-                        toggleBlackoutForWeekday(day)
-                    }
+            }
+            .contextMenu {
+                Button(day.isBlackout ? "Mark as Available" : "Mark as Unavailable") {
+                    toggleBlackout(day)
+                }
+                Button(day.isBlackout
+                       ? "Mark All \(weekdayName(for: day.date))s as Available"
+                       : "Mark All \(weekdayName(for: day.date))s as Unavailable") {
+                    toggleBlackoutForWeekday(day)
                 }
             }
 
@@ -236,9 +252,9 @@ struct CompactMonthCalendarView: View {
 
             if !day.scenes.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Total: \(formattedEighths(day.totalDuration))")
+                    Text("\(L("Total:")) \(formattedEighths(day.totalDuration))")
                         .font(.caption2).fontWeight(.medium).foregroundColor(.secondary)
-                    Text("Est: \(formattedTime(day.totalEstimatedTime))")
+                    Text("\(L("Est:")) \(formattedTime(day.totalEstimatedTime))")
                         .font(.caption2).fontWeight(.medium).foregroundColor(.secondary)
                 }
             }
@@ -652,60 +668,63 @@ struct SceneCardView: View {
     private var displayColor: Color { isFlagged ? .red : scene.dayNightType.color }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 4) {
-            Circle()
-                .fill(displayColor)
-                .frame(width: 8, height: 8)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 3) {
-                    Text(scene.displayTitle)
-                        .font(.caption2).fontWeight(.medium).lineLimit(2)
-                    if hasConflict {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 7))
-                            .foregroundColor(.red)
-                            .help("An actor in this scene is marked unavailable this day")
-                    }
-                    if isOnBlackoutDay {
-                        Image(systemName: "nosign")
-                            .font(.system(size: 7))
-                            .foregroundColor(.red)
-                            .help("Scheduled on a day marked unavailable")
-                    }
-                    if hasDuplicateSceneNumber {
-                        Image(systemName: "number.square.fill")
-                            .font(.system(size: 7))
-                            .foregroundColor(.red)
-                            .help("Duplicate scene number '\(scene.sceneNumber)' — another scene uses it too.")
-                    }
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 3) {
+                if !scene.sceneNumber.isEmpty {
+                    Text(scene.sceneNumber)
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(scene.stripTextColor.opacity(0.7))
                 }
-
-                Text("(\(formattedEighths(scene.duration)), \(formattedTime(scene.estimatedTime)))")
-                    .font(.caption2).foregroundColor(.secondary)
-
-                // Cast only shows when the sidebar is collapsed
-                if showCast, !scene.cast.isEmpty {
-                    Text(scene.cast.joined(separator: ", "))
-                        .font(.caption2).foregroundColor(.secondary).italic()
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                Text(scene.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(scene.stripTextColor)
+                    .lineLimit(2)
+                Spacer(minLength: 2)
+                if hasConflict {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 7))
+                        .foregroundColor(.red)
+                }
+                if isOnBlackoutDay {
+                    Image(systemName: "nosign")
+                        .font(.system(size: 7))
+                        .foregroundColor(.red)
+                }
+                if hasDuplicateSceneNumber {
+                    Image(systemName: "number.square.fill")
+                        .font(.system(size: 7))
+                        .foregroundColor(.red)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 4) {
+                Text("(\(formattedEighths(scene.duration)), \(formattedTime(scene.estimatedTime)))")
+                    .font(.system(size: 8))
+                    .foregroundColor(scene.stripTextColor.opacity(0.7))
+                Spacer()
+            }
+
+            // Cast only shows when the sidebar is collapsed
+            if showCast, !scene.cast.isEmpty {
+                Text(scene.cast.joined(separator: ", "))
+                    .font(.system(size: 8))
+                    .foregroundColor(scene.stripTextColor.opacity(0.6))
+                    .italic()
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(displayColor.opacity(isDragging ? 0.3 : (isFlagged ? 0.22 : 0.15)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(
-                            isSelected ? Color.accentColor : displayColor.opacity(isDragging ? 0.8 : (isFlagged ? 0.9 : 0.4)),
-                            lineWidth: isSelected ? 2 : (isDragging || isFlagged ? 2 : 1)
-                        )
+                .fill(scene.stripColor.opacity(isDragging ? 0.7 : 1.0))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(
+                    isSelected ? Color.accentColor : (isFlagged ? Color.red : scene.stripTextColor.opacity(0.2)),
+                    lineWidth: isSelected ? 2 : (isFlagged ? 1.5 : 0.5)
                 )
         )
         .overlay(
@@ -721,30 +740,19 @@ struct SceneCardView: View {
             interactingSceneId = scene.id
             onDragStart()
             return NSItemProvider(object: dragPayload() as NSString)
-        } preview: {
-            HStack(spacing: 4) {
-                Circle().fill(scene.dayNightType.color).frame(width: 8, height: 8)
-                Text(scene.displayTitle).font(.caption).fontWeight(.medium)
-            }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(NSColor.controlBackgroundColor))
-                    .shadow(radius: 4)
-            )
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { interactingSceneId = nil; onEdit() })
         .simultaneousGesture(TapGesture(count: 1).onEnded { interactingSceneId = nil; onSelect() })
         .contextMenu {
-            Button("Edit Scene") { interactingSceneId = nil; onEdit() }
+            Button(L("Edit Scene")) { interactingSceneId = nil; onEdit() }
 
-            Button(isMultiSelected ? "Remove \(selectionCount) Scenes from Day" : "Remove from Day") {
+            Button(isMultiSelected ? "\(L("Remove")) \(selectionCount) \(L("scenes"))" : L("Remove from Day")) {
                 interactingSceneId = nil; onRemove()
             }
             Divider()
-            Button("Duplicate Scene") { interactingSceneId = nil; onDuplicate() }
+            Button(L("Duplicate Scene")) { interactingSceneId = nil; onDuplicate() }
             Divider()
-            Button(isMultiSelected ? "Send \(selectionCount) Scenes to Day…" : "Send to Day…") {
+            Button(isMultiSelected ? "\(L("Send to Day…")) (\(selectionCount))" : L("Send to Day…")) {
                 interactingSceneId = nil; onSendToDay()
             }
         }

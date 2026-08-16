@@ -1,5 +1,5 @@
 // CallSheetExporter.swift
-// Generates a 100% English Call Sheet PDF matching standard film industry layout.
+// Generates a professional Call Sheet PDF matching standard film industry layout with Basecamp and Actor Scenes.
 
 import AppKit
 import SwiftUI
@@ -41,7 +41,7 @@ class CallSheetExporter {
         projectTitle: String,
         dayNumber: Int? = nil,
         totalProductionDays: Int = 0,
-        language: AppLanguage = .english
+        language: AppLanguage = LocalizationManager.shared.currentLanguage
     ) -> Data? {
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData) else { return nil }
@@ -74,28 +74,31 @@ class CallSheetExporter {
         beginPage()
 
         // 1. Top Header Banner
-        y = drawTopBanner(y: y, shootDay: shootDay, dayNumber: dayNumber)
+        y = drawTopBanner(y: y, shootDay: shootDay, dayNumber: dayNumber, lang: language)
 
         // 2. General Call Banner (with Quote of the day if exists)
-        y = drawGeneralCallBanner(y: y, callSheet: shootDay.callSheet)
+        y = drawGeneralCallBanner(y: y, callSheet: shootDay.callSheet, lang: language)
 
         // 3. Three-Block Info Row (Shooting Contacts, Milestones, Weather)
-        y = drawThreeBlockInfoRow(y: y, shootDay: shootDay, productionInfo: productionInfo)
+        y = drawThreeBlockInfoRow(y: y, shootDay: shootDay, productionInfo: productionInfo, lang: language)
 
-        // 4. Nearest Hospital
-        y = drawHospitalBar(y: y, callSheet: shootDay.callSheet)
+        // 4. Basecamp Bar (Above Nearest Hospital)
+        y = drawBasecampBar(y: y, callSheet: shootDay.callSheet, lang: language)
 
-        // 5. Scenes Breakdown Table
-        y = drawScenesTable(y: y, shootDay: shootDay, ensureRoom: ensureRoom)
+        // 5. Nearest Hospital
+        y = drawHospitalBar(y: y, callSheet: shootDay.callSheet, lang: language)
 
-        // 6. Cast Call Table
-        y = drawCastTable(y: y, shootDay: shootDay, productionInfo: productionInfo, ensureRoom: ensureRoom)
+        // 6. Scenes Breakdown Table
+        y = drawScenesTable(y: y, shootDay: shootDay, lang: language, ensureRoom: ensureRoom)
 
-        // 7. Crew Call Times (Role: Name + Call Time)
-        y = drawCrewTable(y: y, shootDay: shootDay, productionInfo: productionInfo, ensureRoom: ensureRoom)
+        // 7. Cast Call Table (with SCENES column)
+        y = drawCastTable(y: y, shootDay: shootDay, productionInfo: productionInfo, lang: language, ensureRoom: ensureRoom)
 
-        // 8. General Notes (Unified in one single block)
-        y = drawProductionNotes(y: y, callSheet: shootDay.callSheet, ensureRoom: ensureRoom)
+        // 8. Crew Call Times (Role: Name + Call Time)
+        y = drawCrewTable(y: y, shootDay: shootDay, productionInfo: productionInfo, lang: language, ensureRoom: ensureRoom)
+
+        // 9. General Notes (Unified in one single block)
+        y = drawProductionNotes(y: y, callSheet: shootDay.callSheet, lang: language, ensureRoom: ensureRoom)
 
         endPage()
         ctx.closePDF()
@@ -104,7 +107,7 @@ class CallSheetExporter {
 
     // MARK: - 1. Top Banner
 
-    private static func drawTopBanner(y: CGFloat, shootDay: ShootDay, dayNumber: Int?) -> CGFloat {
+    private static func drawTopBanner(y: CGFloat, shootDay: ShootDay, dayNumber: Int?, lang: AppLanguage) -> CGFloat {
         let height: CGFloat = 22
         let rect = CGRect(x: margin, y: y - height, width: contentWidth, height: height)
 
@@ -114,7 +117,8 @@ class CallSheetExporter {
         let border = NSBezierPath(rect: rect); border.lineWidth = 1; border.stroke()
 
         let numStr = dayNumber.map { String(format: "%02d", $0) } ?? "01"
-        let fullText = "CALL SHEET #\(numStr) — \(formattedFullDate(shootDay.date))"
+        let titleLabel = lang == .spanish ? "ORDEN DE RODAJE Nº" : "CALL SHEET #"
+        let fullText = "\(titleLabel) \(numStr) — \(formattedFullDate(shootDay.date))"
 
         let para = NSMutableParagraphStyle(); para.alignment = .center
         let attr: [NSAttributedString.Key: Any] = [
@@ -130,7 +134,7 @@ class CallSheetExporter {
 
     // MARK: - 2. General Call Banner
 
-    private static func drawGeneralCallBanner(y: CGFloat, callSheet: CallSheetData) -> CGFloat {
+    private static func drawGeneralCallBanner(y: CGFloat, callSheet: CallSheetData, lang: AppLanguage) -> CGFloat {
         let hasQuote = !callSheet.quoteOfTheDay.trimmingCharacters(in: .whitespaces).isEmpty
         let height: CGFloat = hasQuote ? 72 : 62
         let rect = CGRect(x: margin, y: y - height, width: contentWidth, height: height)
@@ -142,13 +146,14 @@ class CallSheetExporter {
 
         let para = NSMutableParagraphStyle(); para.alignment = .center
 
-        // Subtitle "GENERAL CALL"
+        // Subtitle
+        let callTitle = lang == .spanish ? "CITACIÓN GENERAL" : "GENERAL CALL"
         let subAttr: [NSAttributedString.Key: Any] = [
             .font: fontSectionHdr,
             .foregroundColor: colorDark,
             .paragraphStyle: para
         ]
-        NSAttributedString(string: "GENERAL CALL", attributes: subAttr)
+        NSAttributedString(string: callTitle, attributes: subAttr)
             .draw(in: CGRect(x: rect.minX, y: rect.maxY - 14, width: rect.width, height: 12))
 
         // Big Call Time (12h)
@@ -169,7 +174,8 @@ class CallSheetExporter {
                 .foregroundColor: colorBlack,
                 .paragraphStyle: para
             ]
-            let quoteStr = "“Quote of the day: \(callSheet.quoteOfTheDay)”"
+            let quotePrefix = lang == .spanish ? "Frase del día" : "Quote of the day"
+            let quoteStr = "“\(quotePrefix): \(callSheet.quoteOfTheDay)”"
             NSAttributedString(string: quoteStr, attributes: quoteAttr)
                 .draw(in: CGRect(x: rect.minX + 8, y: bottomY, width: rect.width - 16, height: 11))
             bottomY += 12
@@ -186,7 +192,8 @@ class CallSheetExporter {
                 .replacingOccurrences(of: "Jornada de ", with: "")
                 .replacingOccurrences(of: "Jornada ", with: "")
                 .replacingOccurrences(of: "Schedule: ", with: "")
-            let schedText = "Schedule: \(rawSched)"
+            let prefix = lang == .spanish ? "Jornada: " : "Schedule: "
+            let schedText = "\(prefix)\(rawSched)"
             NSAttributedString(string: schedText, attributes: schedAttr)
                 .draw(in: CGRect(x: rect.minX, y: bottomY, width: rect.width, height: 11))
         }
@@ -196,7 +203,7 @@ class CallSheetExporter {
 
     // MARK: - 3. Three-Block Info Row
 
-    private static func drawThreeBlockInfoRow(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo) -> CGFloat {
+    private static func drawThreeBlockInfoRow(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo, lang: AppLanguage) -> CGFloat {
         let height: CGFloat = 68
         let w1: CGFloat = contentWidth * 0.33
         let w2: CGFloat = contentWidth * 0.33
@@ -214,8 +221,9 @@ class CallSheetExporter {
 
         // --- Box 1: SHOOTING CONTACTS ---
         let cPara = NSMutableParagraphStyle(); cPara.alignment = .center
+        let contactsTitle = lang == .spanish ? "☎ CONTACTOS EN RODAJE" : "☎ SHOOTING CONTACTS"
         let cTitleAttr: [NSAttributedString.Key: Any] = [.font: fontSectionHdr, .foregroundColor: colorBlack, .paragraphStyle: cPara]
-        NSAttributedString(string: "☎ SHOOTING CONTACTS", attributes: cTitleAttr)
+        NSAttributedString(string: contactsTitle, attributes: cTitleAttr)
             .draw(in: CGRect(x: r1.minX + 4, y: r1.maxY - 13, width: r1.width - 8, height: 12))
 
         let bPara = NSMutableParagraphStyle(); bPara.alignment = .center
@@ -234,7 +242,8 @@ class CallSheetExporter {
         }
 
         if !prodContact.isEmpty {
-            NSAttributedString(string: "PRODUCER", attributes: nameAttr)
+            let prodLabel = lang == .spanish ? "PRODUCTOR" : "PRODUCER"
+            NSAttributedString(string: prodLabel, attributes: nameAttr)
                 .draw(in: CGRect(x: r1.minX + 4, y: cY, width: r1.width - 8, height: 10))
             cY -= 10
             NSAttributedString(string: prodContact, attributes: subAttr)
@@ -246,7 +255,7 @@ class CallSheetExporter {
         var secondRole = ""
         var secondContact = ""
         if !productionInfo.adName.isEmpty {
-            secondRole = "1ST AD"
+            secondRole = lang == .spanish ? "AYUDANTE DE DIRECCIÓN" : "1ST AD"
             let phone = productionInfo.adPhone.isEmpty ? "" : " - Tel: \(productionInfo.adPhone)"
             secondContact = "\(productionInfo.adName)\(phone)"
         } else if !productionInfo.directorName.isEmpty {
@@ -254,7 +263,7 @@ class CallSheetExporter {
             let phone = productionInfo.directorPhone.isEmpty ? "" : " - Tel: \(productionInfo.directorPhone)"
             secondContact = "\(productionInfo.directorName)\(phone)"
         } else if !cs.adContact.isEmpty {
-            secondRole = "1ST AD"
+            secondRole = lang == .spanish ? "AYUDANTE DE DIRECCIÓN" : "1ST AD"
             secondContact = cs.adContact
         }
 
@@ -267,14 +276,19 @@ class CallSheetExporter {
         }
 
         // --- Box 2: MILESTONES & MEAL TIMES ---
+        let readyLabel = lang == .spanish ? "LISTOS" : "READY TO SHOOT"
+        let lunchLabel = lang == .spanish ? "ALMUERZO" : "LUNCH"
+        let snackLabel = lang == .spanish ? "MERIENDA" : "SNACK"
+        let wrapLabel  = lang == .spanish ? "FIN / CENA" : "WRAP"
+
         var milestones: [(String, String)] = []
-        if !cs.readyToShootTime.isEmpty { milestones.append(("READY TO SHOOT", cs.readyToShootTime)) }
-        if !cs.lunchTime.isEmpty        { milestones.append(("LUNCH", cs.lunchTime)) }
-        if !cs.snackTime.isEmpty        { milestones.append(("SNACK", cs.snackTime)) }
-        if !cs.dinnerTime.isEmpty       { milestones.append(("WRAP", cs.dinnerTime)) }
+        if !cs.readyToShootTime.isEmpty { milestones.append((readyLabel, cs.readyToShootTime)) }
+        if !cs.lunchTime.isEmpty        { milestones.append((lunchLabel, cs.lunchTime)) }
+        if !cs.snackTime.isEmpty        { milestones.append((snackLabel, cs.snackTime)) }
+        if !cs.dinnerTime.isEmpty       { milestones.append((wrapLabel, cs.dinnerTime)) }
 
         if milestones.isEmpty {
-            milestones = [("READY TO SHOOT", ""), ("LUNCH", ""), ("SNACK", ""), ("WRAP", "")]
+            milestones = [(readyLabel, ""), (lunchLabel, ""), (snackLabel, ""), (wrapLabel, "")]
         }
 
         let rowH = height / CGFloat(milestones.count)
@@ -294,7 +308,8 @@ class CallSheetExporter {
         }
 
         // --- Box 3: WEATHER FORECAST ---
-        NSAttributedString(string: "☁ WEATHER FORECAST", attributes: cTitleAttr)
+        let weatherTitle = lang == .spanish ? "☁ PREVISIÓN METEOROLÓGICA" : "☁ WEATHER FORECAST"
+        NSAttributedString(string: weatherTitle, attributes: cTitleAttr)
             .draw(in: CGRect(x: r3.minX + 4, y: r3.maxY - 13, width: r3.width - 8, height: 12))
 
         var wY = r3.maxY - 25
@@ -319,17 +334,40 @@ class CallSheetExporter {
         return y - height
     }
 
-    // MARK: - 4. Nearest Hospital
+    // MARK: - 4. Basecamp Bar (Above Hospital)
 
-    private static func drawHospitalBar(y: CGFloat, callSheet: CallSheetData) -> CGFloat {
+    private static func drawBasecampBar(y: CGFloat, callSheet: CallSheetData, lang: AppLanguage) -> CGFloat {
+        let height: CGFloat = 18
+        let rect = CGRect(x: margin, y: y - height, width: contentWidth, height: height)
+
+        colorBorder.setStroke()
+        let b = NSBezierPath(rect: rect); b.lineWidth = 0.75; b.stroke()
+
+        let basecampTitle = lang == .spanish ? "⛺ BASECAMP / BASE DE RODAJE:" : "⛺ BASECAMP:"
+        let basecampText = callSheet.basecampLocation.trimmingCharacters(in: .whitespaces)
+        let full = basecampText.isEmpty ? basecampTitle : "\(basecampTitle) \(basecampText)"
+        let attr: [NSAttributedString.Key: Any] = [
+            .font: fontBoldBody,
+            .foregroundColor: colorBlack
+        ]
+        NSAttributedString(string: full, attributes: attr)
+            .draw(in: CGRect(x: rect.minX + 6, y: rect.midY - 5, width: rect.width - 12, height: 11))
+
+        return y - height
+    }
+
+    // MARK: - 5. Nearest Hospital
+
+    private static func drawHospitalBar(y: CGFloat, callSheet: CallSheetData, lang: AppLanguage) -> CGFloat {
         let height: CGFloat = 18
         let rect = CGRect(x: margin, y: y - height, width: contentWidth, height: height)
 
         colorBorder.setStroke()
         let b = NSBezierPath(rect: rect); b.lineWidth = 1; b.stroke()
 
+        let hospTitle = lang == .spanish ? "✚ HOSPITAL MÁS CERCANO:" : "✚ NEAREST HOSPITAL:"
         let hospText = callSheet.nearestHospital.trimmingCharacters(in: .whitespaces)
-        let full = hospText.isEmpty ? "✚ NEAREST HOSPITAL:" : "✚ NEAREST HOSPITAL: \(hospText)"
+        let full = hospText.isEmpty ? hospTitle : "\(hospTitle) \(hospText)"
         let attr: [NSAttributedString.Key: Any] = [
             .font: fontBoldBody,
             .foregroundColor: colorBlack
@@ -340,18 +378,18 @@ class CallSheetExporter {
         return y - height - 4
     }
 
-    // MARK: - 5. Scenes Table
+    // MARK: - 6. Scenes Table
 
-    private static func drawScenesTable(y: CGFloat, shootDay: ShootDay, ensureRoom: (CGFloat) -> Void) -> CGFloat {
+    private static func drawScenesTable(y: CGFloat, shootDay: ShootDay, lang: AppLanguage, ensureRoom: (CGFloat) -> Void) -> CGFloat {
         var y = y
         let headerH: CGFloat = 16
         let cols: [(title: String, width: CGFloat)] = [
-            ("SCENE",       65),
-            ("SET / DESCRIPTION", 180),
-            ("CAST",        95),
-            ("PAGES",       55),
+            (lang == .spanish ? "ESCENA" : "SCENE",       65),
+            (lang == .spanish ? "DECORADO" : "SET / DESCRIPTION", 180),
+            (lang == .spanish ? "PERSONAJES" : "CAST",        95),
+            (lang == .spanish ? "PÁGINAS" : "PAGES",       55),
             ("LOC",         35),
-            ("ADDRESS",     contentWidth - 65 - 180 - 95 - 55 - 35)
+            (lang == .spanish ? "DIRECCIÓN" : "ADDRESS",     contentWidth - 65 - 180 - 95 - 55 - 35)
         ]
 
         ensureRoom(headerH + 30)
@@ -417,7 +455,7 @@ class CallSheetExporter {
             drawCenteredText(pgs, font: fontRegularBody, in: CGRect(x: c4.minX, y: c4.midY - 6, width: c4.width, height: 12))
             x += cols[3].width
 
-            // Determine LOC index and Address based on scene.realLocation or scene decorado
+            // Determine LOC index and Address
             var locIndexStr = "1"
             var addrStr = ""
             if let matchedIdx = dayLocations.firstIndex(where: {
@@ -448,20 +486,21 @@ class CallSheetExporter {
         return y - 6
     }
 
-    // MARK: - 6. Cast Table
+    // MARK: - 7. Cast Table (with SCENES column)
 
-    private static func drawCastTable(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo, ensureRoom: (CGFloat) -> Void) -> CGFloat {
+    private static func drawCastTable(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo, lang: AppLanguage, ensureRoom: (CGFloat) -> Void) -> CGFloat {
         var y = y
         let headerH: CGFloat = 16
         let cols: [(title: String, width: CGFloat)] = [
-            ("CHARACTER",       80),
-            ("ACTOR/ACTRESS",   125),
-            ("STATUS",          35),
-            ("PICK UP",         52),
-            ("H/MU & WARDROBE", 68),
-            ("ON SET",          52),
-            ("WRAP",            52),
-            ("LOC",             contentWidth - 80 - 125 - 35 - 52 - 68 - 52 - 52)
+            (lang == .spanish ? "PERSONAJE" : "CHARACTER",       75),
+            (lang == .spanish ? "ACTOR/ACTRIZ" : "ACTOR/ACTRESS",  105),
+            (lang == .spanish ? "ESCENAS" : "SCENES",            55),
+            (lang == .spanish ? "ECDT" : "STATUS",               32),
+            (lang == .spanish ? "RECOGIDA" : "PICK UP",          48),
+            (lang == .spanish ? "VEST. Y MAQ." : "H/MU & WARD.", 62),
+            (lang == .spanish ? "LISTOS" : "ON SET",             48),
+            (lang == .spanish ? "FIN" : "WRAP",                 48),
+            ("LOC",             contentWidth - 75 - 105 - 55 - 32 - 48 - 62 - 48 - 48)
         ]
 
         ensureRoom(headerH + 20)
@@ -491,9 +530,19 @@ class CallSheetExporter {
 
             var x = margin
 
+            // Determine scenes for this character if entry.sceneNumbers is empty
+            var scenesStr = entry.sceneNumbers.trimmingCharacters(in: .whitespaces)
+            if scenesStr.isEmpty {
+                let matchedScenes = shootDay.scenes.filter { scene in
+                    scene.cast.contains(where: { $0.caseInsensitiveCompare(entry.characterName) == .orderedSame })
+                }.map { $0.extractedSceneNumber }
+                scenesStr = matchedScenes.joined(separator: ", ")
+            }
+
             let vals = [
                 entry.characterName,
                 entry.actorName,
+                scenesStr,
                 entry.ecdt,
                 entry.pickupTime,
                 entry.hmuWardrobeTime,
@@ -524,9 +573,9 @@ class CallSheetExporter {
         return y - 6
     }
 
-    // MARK: - 7. Crew Call Table (Showing Name AND Role together, with name lookup)
+    // MARK: - 8. Crew Call Table
 
-    private static func drawCrewTable(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo, ensureRoom: (CGFloat) -> Void) -> CGFloat {
+    private static func drawCrewTable(y: CGFloat, shootDay: ShootDay, productionInfo: ProductionInfo, lang: AppLanguage, ensureRoom: (CGFloat) -> Void) -> CGFloat {
         var y = y
         let bannerH: CGFloat = 16
         ensureRoom(bannerH + 30)
@@ -538,8 +587,9 @@ class CallSheetExporter {
         let b = NSBezierPath(rect: bRect); b.lineWidth = 0.5; colorBorder.setStroke(); b.stroke()
 
         let para = NSMutableParagraphStyle(); para.alignment = .center
+        let crewTitle = lang == .spanish ? "CITACIÓN ESPECÍFICA DEL EQUIPO TÉCNICO" : "CREW CALL TIMES"
         let attr: [NSAttributedString.Key: Any] = [.font: fontSectionHdr, .foregroundColor: colorBlack, .paragraphStyle: para]
-        NSAttributedString(string: "CREW CALL TIMES", attributes: attr)
+        NSAttributedString(string: crewTitle, attributes: attr)
             .draw(in: CGRect(x: bRect.minX, y: bRect.midY - 5, width: bRect.width, height: 11))
         y -= bannerH
 
@@ -550,7 +600,6 @@ class CallSheetExporter {
         let colWidth3 = contentWidth / 3
         let rowH: CGFloat = 14
 
-        // Group into rows of 3
         let chunks = stride(from: 0, to: entries.count, by: 3).map {
             Array(entries[$0..<min($0 + 3, entries.count)])
         }
@@ -564,7 +613,6 @@ class CallSheetExporter {
                 let roleWidth: CGFloat = colWidth3 - 52
                 let lAttr: [NSAttributedString.Key: Any] = [.font: fontRegularBody, .foregroundColor: colorBlack]
 
-                // Look up name from productionInfo if member.name is empty
                 var memberName = member.name.trimmingCharacters(in: .whitespaces)
                 let memberRole = member.role.trimmingCharacters(in: .whitespaces)
                 if memberName.isEmpty, !memberRole.isEmpty {
@@ -573,7 +621,6 @@ class CallSheetExporter {
                     }
                 }
 
-                // Display label cleanly without orphaned colons
                 let label: String
                 if !memberRole.isEmpty && !memberName.isEmpty {
                     label = "\(memberRole): \(memberName)"
@@ -600,26 +647,25 @@ class CallSheetExporter {
         return y - 6
     }
 
-    // MARK: - 8. General Notes (Unified in one single block)
+    // MARK: - 9. General Notes
 
-    private static func drawProductionNotes(y: CGFloat, callSheet: CallSheetData, ensureRoom: (CGFloat) -> Void) -> CGFloat {
+    private static func drawProductionNotes(y: CGFloat, callSheet: CallSheetData, lang: AppLanguage, ensureRoom: (CGFloat) -> Void) -> CGFloat {
         var y = y
         let bannerH: CGFloat = 16
         ensureRoom(bannerH + 30)
 
-        // Banner Header
         let bRect = CGRect(x: margin, y: y - bannerH, width: contentWidth, height: bannerH)
         colorGrayHeader.setFill()
         NSBezierPath(rect: bRect).fill()
         let b = NSBezierPath(rect: bRect); b.lineWidth = 0.5; colorBorder.setStroke(); b.stroke()
 
         let para = NSMutableParagraphStyle(); para.alignment = .center
+        let notesTitle = lang == .spanish ? "OBSERVACIONES GENERALES" : "GENERAL NOTES"
         let attr: [NSAttributedString.Key: Any] = [.font: fontSectionHdr, .foregroundColor: colorBlack, .paragraphStyle: para]
-        NSAttributedString(string: "GENERAL NOTES", attributes: attr)
+        NSAttributedString(string: notesTitle, attributes: attr)
             .draw(in: CGRect(x: bRect.minX, y: bRect.midY - 5, width: bRect.width, height: 11))
         y -= bannerH
 
-        // Unified multiline text
         let notesText = callSheet.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? callSheet.productionNotes.joined(separator: "\n")
             : callSheet.notes

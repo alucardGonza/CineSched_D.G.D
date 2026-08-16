@@ -24,21 +24,21 @@ struct NewSceneInputView: View {
             HStack(spacing: 6) {
                 TextField("#", text: $newSceneNumber)
                     .frame(width: 60)
-                    .help("Scene number (optional)")
-                TextField("Scene Title", text: $newSceneTitle)
+                    .help(L("Scene #"))
+                TextField(L("Scene Title"), text: $newSceneTitle)
             }
 
             // Real Location with Autocomplete
             LocationAutocompleteField(
-                title: "Real Location / Set",
-                placeholder: "e.g. Playa de la Concha",
+                title: L("Real Location"),
+                placeholder: "e.g. Hotel Renaissance, Room 204",
                 text: $newRealLocation,
                 suggestions: knownLocations
             )
 
             // Duration field — optional for Custom strips / notice strips
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Page Count (e.g. 1 4/8)", text: $newDuration)
+                TextField(L("Duration (pages)"), text: $newDuration)
                     .onChange(of: newDuration) { _ in validateInputs() }
 
                 if !durationIsValid {
@@ -55,7 +55,7 @@ struct NewSceneInputView: View {
 
             // Estimated time field
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Est. Shoot Time (e.g. 4, 15, 2:30)", text: $newEstimate)
+                TextField(L("Estimated Time"), text: $newEstimate)
                     .onChange(of: newEstimate) { _ in validateInputs() }
 
                 if !estimatedTimeIsValid {
@@ -71,7 +71,7 @@ struct NewSceneInputView: View {
 
             // Day / Night / Dawn / Dusk / Afternoon / Custom toggle
             VStack(alignment: .leading, spacing: 4) {
-                Text("Time:").font(.caption).foregroundColor(.secondary)
+                Text("\(L("Type")):").font(.caption).foregroundColor(.secondary)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                     ForEach(DayNightType.allCases, id: \.self) { type in
@@ -80,11 +80,11 @@ struct NewSceneInputView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: newDayNightType == type ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(type.color)
+                                    .foregroundColor(newDayNightType == type ? .accentColor : .secondary)
                                     .font(.caption)
-                                Text(type == .custom ? "Custom" : type.displayName)
+                                Text(L(type.rawValue.uppercased()))
                                     .font(.caption)
-                                    .foregroundColor(newDayNightType == type ? type.color : .primary)
+                                    .foregroundColor(newDayNightType == type ? .primary : .secondary)
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
                             }
@@ -94,48 +94,48 @@ struct NewSceneInputView: View {
                 }
             }
 
-            Button("Add Scene") {
+            Button(L("Add Scene")) {
                 addScene()
             }
             .disabled(!canAddScene())
         }
-        .padding(8)
     }
 
     private func validateInputs() {
-        durationIsValid      = FractionParser.parseToEighths(newDuration) != nil || newDuration.isEmpty
-        estimatedTimeIsValid = TimeParser.parseToMinutes(newEstimate) != nil || newEstimate.isEmpty
+        durationIsValid = newDuration.isEmpty || FractionParser.parseToEighths(newDuration) != nil
+        estimatedTimeIsValid = newEstimate.isEmpty || TimeParser.parseToMinutes(newEstimate) != nil
     }
 
-    /// A title is the only thing a scene actually needs — duration and time
-    /// are optional and default to zero when left blank, since a
-    /// notice strip (no scene number, e.g. "DOWN FOR THANKSGIVING") often has
-    /// neither. Non-empty text in either field still has to actually parse.
     private func canAddScene() -> Bool {
-        let titleOK = !newSceneTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return titleOK && durationIsValid && estimatedTimeIsValid
+        guard !newSceneTitle.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        return durationIsValid && estimatedTimeIsValid
     }
 
     private func addScene() {
-        guard canAddScene() else { return }
-
         let duration = FractionParser.parseToEighths(newDuration) ?? 0
-        let estimate = TimeParser.parseToMinutes(newEstimate) ?? 0
+        let estimatedTime: Int
+        if let explicitMinutes = TimeParser.parseToMinutes(newEstimate) {
+            estimatedTime = explicitMinutes
+        } else if duration > 0 {
+            estimatedTime = TimeParser.estimatedMinutes(forEighths: duration)
+        } else {
+            estimatedTime = 0
+        }
 
         allScenes.append(Scene(
             title:         newSceneTitle,
-            sceneNumber:   newSceneNumber.trimmingCharacters(in: .whitespaces),
+            sceneNumber:   newSceneNumber,
             duration:      duration,
-            estimatedTime: estimate,
+            estimatedTime: estimatedTime,
             dayNightType:  newDayNightType,
-            realLocation:  newRealLocation.trimmingCharacters(in: .whitespaces)
+            realLocation:  newRealLocation
         ))
 
         newSceneNumber  = ""
         newSceneTitle   = ""
-        newRealLocation = ""
         newDuration     = ""
         newEstimate     = ""
+        newRealLocation = ""
         newDayNightType = .day
     }
 }

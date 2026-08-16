@@ -3,20 +3,33 @@
 
 import Foundation
 
-/// Returns a short date string, e.g. "Mon Jun 2"
-func formattedDate(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "E MMM d"
-    return formatter.string(from: date)
+/// Returns the appropriate Locale based on current app language
+func appLocale() -> Locale {
+    LocalizationManager.shared.currentLanguage == .spanish ? Locale(identifier: "es_ES") : Locale(identifier: "en_US")
 }
 
-/// Returns a full date string, e.g. "Tuesday, October 6, 2026" — used by the
-/// stripboard's "END OF DAY" marker, where the calendar's abbreviated
-/// formattedDate would read too clipped for a full-width banner line.
+/// Returns a short date string, e.g. "Mon Jun 2" or "Lun 2 Jun"
+func formattedDate(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = appLocale()
+    formatter.dateFormat = LocalizationManager.shared.currentLanguage == .spanish ? "E d MMM" : "E MMM d"
+    return formatter.string(from: date).capitalized
+}
+
+/// Returns a full date string, e.g. "Tuesday, October 6, 2026" or "Martes, 6 de octubre de 2026"
 func formattedFullDate(_ date: Date) -> String {
     let formatter = DateFormatter()
-    formatter.dateFormat = "EEEE, MMMM d, yyyy"
-    return formatter.string(from: date)
+    formatter.locale = appLocale()
+    formatter.dateFormat = LocalizationManager.shared.currentLanguage == .spanish ? "EEEE, d 'de' MMMM, yyyy" : "EEEE, MMMM d, yyyy"
+    return formatter.string(from: date).capitalized
+}
+
+/// Returns weekday name in the current language, e.g. "Monday" / "Lunes"
+func weekdayName(for date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = appLocale()
+    formatter.dateFormat = "EEEE"
+    return formatter.string(from: date).capitalized
 }
 
 /// Returns a minute count as "H:MM", e.g. 510 -> "8:30" — used by the
@@ -47,16 +60,12 @@ func isWeekend(_ date: Date) -> Bool {
 }
 
 /// Maps each ShootDay's id to its "Day N" production-day number — the Nth
-/// day, in date order, that has at least one real scene (a scene with a
-/// scene number). Days with no scenes, or only notice/banner scenes (blank
-/// scene number, e.g. "DOWN FOR THANKSGIVING"), don't count and don't break
-/// the sequence — they're just skipped, not renumbered around.
+/// day, in date order, that has at least one scene scheduled.
 func productionDayNumbers(for shootDays: [ShootDay]) -> [UUID: Int] {
     var result: [UUID: Int] = [:]
     var counter = 0
     for day in shootDays {
-        let hasRealScene = day.scenes.contains { !$0.sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty }
-        if hasRealScene {
+        if !day.scenes.isEmpty {
             counter += 1
             result[day.id] = counter
         }

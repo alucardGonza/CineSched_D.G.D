@@ -5,6 +5,7 @@
 import SwiftUI
 
 struct ProductionSetupSheet: View {
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Binding var productionInfo: ProductionInfo
     @Binding var isPresented: Bool
     let onSave: () -> Void
@@ -40,9 +41,9 @@ struct ProductionSetupSheet: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Production Setup")
+                    Text(L("Production Setup"))
                         .font(.title2).fontWeight(.bold)
-                    Text("These details appear on every call sheet")
+                    Text(L("These details appear on every call sheet"))
                         .font(.subheadline).foregroundColor(.secondary)
                 }
                 Spacer()
@@ -62,64 +63,62 @@ struct ProductionSetupSheet: View {
 
                     // Production details
                     Group {
-                        Label("Production Details", systemImage: "building.2").font(.headline)
-                        LabeledField("Production Company", placeholder: "e.g. Tempel Films", text: $companyName)
+                        Label(L("Production Details"), systemImage: "building.2").font(.headline)
+                        LabeledField(L("Production Company"), placeholder: "e.g. Tempel Films", text: $companyName)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Director").font(.subheadline).foregroundColor(.secondary)
+                            Text(L("Director")).font(.subheadline).foregroundColor(.secondary)
                             HStack(spacing: 8) {
-                                TextField("Director name", text: $directorName)
+                                TextField(L("Director name"), text: $directorName)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                                TextField("Phone", text: $directorPhone)
+                                TextField(L("Phone"), text: $directorPhone)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .frame(maxWidth: 180)
                             }
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Producer").font(.subheadline).foregroundColor(.secondary)
+                            Text(L("Producer")).font(.subheadline).foregroundColor(.secondary)
                             HStack(spacing: 8) {
-                                TextField("Producer name", text: $producerName)
+                                TextField(L("Producer name"), text: $producerName)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                                TextField("Phone", text: $producerPhone)
+                                TextField(L("Phone"), text: $producerPhone)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .frame(maxWidth: 180)
                             }
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("1st AD (Assistant Director)").font(.subheadline).foregroundColor(.secondary)
+                            Text(L("1st AD (Assistant Director)")).font(.subheadline).foregroundColor(.secondary)
                             HStack(spacing: 8) {
-                                TextField("1st AD name", text: $adName)
+                                TextField(L("1st AD name"), text: $adName)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                                TextField("Phone", text: $adPhone)
+                                TextField(L("Phone"), text: $adPhone)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .frame(maxWidth: 180)
                             }
                         }
 
-                        LabeledField("Default Lunch Time", placeholder: "e.g. 01:30 PM", text: $defaultLunchTime)
+                        LabeledField(L("Default Lunch Time"), placeholder: "e.g. 01:30 PM", text: $defaultLunchTime)
                     }
 
                     Divider()
 
                     // Cast list
-                    Label("Cast", systemImage: "star").font(.headline)
-                    Text("Enter each actor and the character they play. Scene strips use character names — the app will look up the actor automatically. Editing a name here updates it everywhere, including scenes and call sheets already scheduled.")
-                        .font(.caption).foregroundColor(.secondary)
+                    Label(L("Cast Roster"), systemImage: "star").font(.headline)
 
                     if castList.isEmpty {
-                        Text("No cast added yet.").font(.caption).foregroundColor(.secondary)
+                        Text(L("No cast added yet.")).font(.caption).foregroundColor(.secondary)
                     } else {
                         ForEach(Array(castList.enumerated()), id: \.element.id) { index, member in
                             HStack(spacing: 8) {
-                                TextField("Actor name", text: Binding(
+                                TextField(L("Actor Name"), text: Binding(
                                     get: { castList[index].actorName },
                                     set: { castList[index].actorName = $0 }
                                 ))
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                                TextField("Character name", text: Binding(
+                                TextField(L("Character"), text: Binding(
                                     get: { castList[index].characterName },
                                     set: { castList[index].characterName = $0 }
                                 ))
@@ -159,9 +158,9 @@ struct ProductionSetupSheet: View {
                     }
 
                     HStack(spacing: 8) {
-                        TextField("Actor name", text: $newActorName)
+                        TextField(L("Actor Name"), text: $newActorName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        TextField("Character name", text: $newCharacterName)
+                        TextField(L("Character"), text: $newCharacterName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         Button {
                             let actor     = newActorName.trimmingCharacters(in: .whitespaces)
@@ -183,22 +182,20 @@ struct ProductionSetupSheet: View {
                     Divider()
 
                     // Crew list
-                    Label("Crew", systemImage: "person.3").font(.headline)
-                    Text("Check \"Daily\" for crew expected on set every day — they'll be pre-populated on each call sheet with their function and phone number.")
-                        .font(.caption).foregroundColor(.secondary)
+                    Label(L("Crew Roster"), systemImage: "person.3").font(.headline)
 
                     // Column header
                     HStack {
-                        Text("Name")
+                        Text(L("Crew Member Name"))
                             .font(.caption).foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("Role / Function")
+                        Text(L("Role / Department"))
                             .font(.caption).foregroundColor(.secondary)
                             .frame(maxWidth: 120, alignment: .leading)
-                        Text("Phone")
+                        Text(L("Phone"))
                             .font(.caption).foregroundColor(.secondary)
                             .frame(maxWidth: 110, alignment: .leading)
-                        Text("Daily")
+                        Text(L("Daily"))
                             .font(.caption).foregroundColor(.secondary)
                             .frame(width: 44, alignment: .center)
                         Spacer().frame(width: 28)
@@ -206,24 +203,24 @@ struct ProductionSetupSheet: View {
                     .padding(.horizontal, 8)
 
                     if crew.isEmpty {
-                        Text("No crew added yet.").font(.caption).foregroundColor(.secondary)
+                        Text(L("No crew added yet.")).font(.caption).foregroundColor(.secondary)
                     } else {
                         ForEach(Array(crew.enumerated()), id: \.element.id) { index, member in
                             HStack(spacing: 6) {
-                                TextField("Name", text: Binding(
+                                TextField(L("Name"), text: Binding(
                                     get: { crew[index].name },
                                     set: { crew[index].name = $0 }
                                 ))
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                                TextField("Role", text: Binding(
+                                TextField(L("Role"), text: Binding(
                                     get: { crew[index].role },
                                     set: { crew[index].role = $0 }
                                 ))
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .frame(maxWidth: 120)
 
-                                TextField("Phone", text: Binding(
+                                TextField(L("Phone"), text: Binding(
                                     get: { crew[index].phone },
                                     set: { crew[index].phone = $0 }
                                 ))
@@ -253,17 +250,16 @@ struct ProductionSetupSheet: View {
 
                     // Add crew member
                     HStack(spacing: 6) {
-                        TextField("Name", text: $newCrewName)
+                        TextField(L("Crew Member Name"), text: $newCrewName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        TextField("Role (e.g. DP)", text: $newCrewRole)
+                        TextField(L("Role / Department"), text: $newCrewRole)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .frame(maxWidth: 120)
-                        TextField("Phone", text: $newCrewPhone)
+                        TextField(L("Phone"), text: $newCrewPhone)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .frame(maxWidth: 110)
-                        Toggle("Daily", isOn: $newCrewIsDailyDefault)
+                        Toggle(L("Daily"), isOn: $newCrewIsDailyDefault)
                             .toggleStyle(.checkbox)
-                            .help("Pre-populate on every call sheet")
                         Button {
                             let name = newCrewName.trimmingCharacters(in: .whitespaces)
                             guard !name.isEmpty else { return }
@@ -287,22 +283,20 @@ struct ProductionSetupSheet: View {
                     Divider()
 
                     // Location roster
-                    Label("Locations", systemImage: "mappin.and.ellipse").font(.headline)
-                    Text("Locations added here can be picked directly when building a day's call sheet, instead of retyping the address every time you shoot there again.")
-                        .font(.caption).foregroundColor(.secondary)
+                    Label(L("Location Roster"), systemImage: "mappin.and.ellipse").font(.headline)
 
                     if locationRoster.isEmpty {
-                        Text("No locations added yet.").font(.caption).foregroundColor(.secondary)
+                        Text(L("No locations added yet.")).font(.caption).foregroundColor(.secondary)
                     } else {
                         ForEach(Array(locationRoster.enumerated()), id: \.element.id) { index, loc in
                             HStack(spacing: 8) {
-                                TextField("Location name", text: Binding(
+                                TextField(L("Location Name"), text: Binding(
                                     get: { locationRoster[index].name },
                                     set: { locationRoster[index].name = $0 }
                                 ))
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                                TextField("Address (optional)", text: Binding(
+                                TextField(L("Address"), text: Binding(
                                     get: { locationRoster[index].address },
                                     set: { locationRoster[index].address = $0 }
                                 ))
@@ -320,9 +314,9 @@ struct ProductionSetupSheet: View {
                     }
 
                     HStack(spacing: 8) {
-                        TextField("Location name", text: $newLocationName)
+                        TextField(L("Location Name"), text: $newLocationName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        TextField("Address (optional)", text: $newLocationAddress)
+                        TextField(L("Address"), text: $newLocationAddress)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         Button {
                             let name = newLocationName.trimmingCharacters(in: .whitespaces)
@@ -342,9 +336,9 @@ struct ProductionSetupSheet: View {
             Divider()
 
             HStack {
-                Button("Cancel") { isPresented = false }.buttonStyle(.bordered)
+                Button(L("Cancel")) { isPresented = false }.buttonStyle(.bordered)
                 Spacer()
-                Button("Save") {
+                Button(L("Save")) {
                     let oldByID = Dictionary(uniqueKeysWithValues: productionInfo.castList.map { ($0.id, $0) })
                     for member in castList {
                         if let old = oldByID[member.id],

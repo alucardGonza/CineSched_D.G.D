@@ -188,7 +188,7 @@ struct SceneEditSheet: View {
 
                 // Day / Night / Custom
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Type").font(.headline)
+                    Text(L("Type")).font(.headline)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                         ForEach(DayNightType.allCases, id: \.self) { type in
                             Button {
@@ -196,9 +196,9 @@ struct SceneEditSheet: View {
                             } label: {
                                 HStack(spacing: 5) {
                                     Image(systemName: editDayNightType == type ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(type.color)
-                                    Text(type == .custom ? "Custom" : type.displayName)
-                                        .foregroundColor(editDayNightType == type ? type.color : .primary)
+                                        .foregroundColor(editDayNightType == type ? .accentColor : .secondary)
+                                    Text(L(type.rawValue.uppercased()))
+                                        .foregroundColor(editDayNightType == type ? .primary : .secondary)
                                         .fontWeight(editDayNightType == type ? .semibold : .regular)
                                         .lineLimit(1)
                                         .fixedSize(horizontal: true, vertical: false)

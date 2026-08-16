@@ -18,11 +18,18 @@ extension UTType {
 enum ScheduleViewMode: String, CaseIterable {
     case calendar   = "Calendar"
     case stripboard = "Stripboard"
+
+    var localizedTitle: String {
+        L(rawValue)
+    }
 }
 
 // MARK: - ContentView
 
 struct ContentView: View {
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
+    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: Project state
     @State var allScenes:   [Scene]    = []
@@ -148,6 +155,8 @@ struct ContentView: View {
             detailView
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
+        .accentColor(currentTheme.primaryAccent(isDarkMode: isDarkMode))
+        .background(WindowAccessor(backgroundColor: currentTheme.canvasBackground(isDarkMode: isDarkMode)))
 
         let withAlerts = applyAlerts(base)
         let withSheets = applySheets(withAlerts)
@@ -193,6 +202,9 @@ struct ContentView: View {
 
     private func applySheets<Content: View>(_ content: Content) -> some View {
         content
+            .sheet(isPresented: $showingColorLegend) {
+                ColorLegendView()
+            }
             .sheet(isPresented: $showingImportSummary) {
                 if let result = completedFountainImport {
                     ImportSummaryView(result: result, onDismiss: { showingImportSummary = false })
@@ -354,6 +366,8 @@ struct ContentView: View {
             }
     }
 
+    @State private var showingColorLegend = false
+
     private func applyNotificationHandlersC<Content: View>(_ content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .csOpenBreakdownBrowser)) { _ in
@@ -371,48 +385,51 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .csShowScheduleLockReport)) { _ in
                 activeSheet = .scheduleLockReport
             }
+            .onReceive(NotificationCenter.default.publisher(for: .csShowColorLegend)) { _ in
+                showingColorLegend = true
+            }
     }
 
     // MARK: - Sidebar
 
     private var sidebarView: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             TextField("Movie Title", text: $projectTitle)
                 .font(.title2)
                 .padding(.bottom, 2)
                 .onChange(of: projectTitle) { _ in markDirty() }
 
-            Text("Shoot Days: \(shootDays.filter { !$0.scenes.isEmpty }.count)")
+            Text("\(L("Shoot Days:")) \(shootDays.filter { !$0.scenes.isEmpty }.count)")
                 .font(.subheadline).foregroundColor(.gray)
 
             if let first = shootDays.first?.date, let last = shootDays.last?.date {
-                Text("From \(formattedDate(first)) to \(formattedDate(last))")
+                Text("\(L("From")) \(formattedDate(first)) \(L("to")) \(formattedDate(last))")
                     .font(.subheadline).foregroundColor(.gray)
             }
 
-            Divider().padding(.vertical)
+            Divider().padding(.vertical, 2)
 
             // Date range picker — collapsible
             DisclosureGroup(isExpanded: $isDateRangeExpanded) {
-                VStack(alignment: .leading, spacing: 10) {
-                    DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
+                VStack(alignment: .leading, spacing: 8) {
+                    DatePicker(L("Start Date"), selection: $startDate, displayedComponents: .date)
                         .onChange(of: startDate) { _ in markDirty() }
-                    DatePicker("End Date", selection: $endDate, displayedComponents: .date)
+                    DatePicker(L("End Date"), selection: $endDate, displayedComponents: .date)
                         .onChange(of: endDate) { _ in markDirty() }
 
-                    Toggle(isOn: $isShiftModeEnabled) { Text("Shift Schedule") }
+                    Toggle(isOn: $isShiftModeEnabled) { Text(L("Shift Schedule")) }
                         .toggleStyle(.switch)
                         .help("When enabled, changing the Start Date shifts all scenes on the calendar.")
                         .onChange(of: isShiftModeEnabled) { _ in markDirty() }
 
-                    Button("Update Calendar") { updateShootDays(from: startDate, to: endDate) }
+                    Button(L("Update Calendar")) { updateShootDays(from: startDate, to: endDate) }
                 }
-                .padding(.top, 6)
+                .padding(.top, 4)
             } label: {
-                Text("Select Date Range").font(.headline)
+                Text(L("Select Date Range")).font(.headline)
             }
 
-            Divider().padding(.vertical)
+            Divider().padding(.vertical, 2)
 
             // New Scene form — collapsible
             DisclosureGroup(isExpanded: $isNewSceneExpanded) {
@@ -424,41 +441,49 @@ struct ContentView: View {
                     newDayNightType:  $newDayNightType,
                     allScenes:        $allScenes
                 )
-                .padding(.top, 6)
+                .padding(.top, 4)
             } label: {
-                Text("New Scene").font(.headline)
+                Text(L("New Scene")).font(.headline)
             }
 
-            Divider().padding(.vertical)
+            Divider().padding(.vertical, 2)
 
             // Boneyard header with sort menu
-            HStack {
-                Text("Boneyard").font(.headline)
-                if !selectedSceneIDs.isEmpty {
-                    Text("· \(selectedSceneIDs.count) selected")
-                        .font(.caption).foregroundColor(.accentColor)
-                    Button("Clear") { selectedSceneIDs = []; lastSelectedSceneID = nil }
-                        .buttonStyle(.plain)
-                        .font(.caption).foregroundColor(.secondary)
-                }
-                Spacer()
-                Menu {
-                    Button("Show Order")    { boneyardSort = .showOrder }
-                    Button("Default Order") { boneyardSort = .defaultOrder }
-                    Button("Location")      { boneyardSort = .location }
-                    Button("INT / EXT")     { boneyardSort = .intExt }
-                    Button("Cast")          { boneyardSort = .cast }
-                    Button("Day / Night")   { boneyardSort = .dayNight }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(boneyardSortLabel)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(L("Boneyard")).font(.headline)
+                    Spacer()
+                    if !selectedSceneIDs.isEmpty {
+                        Button(L("Clear")) { selectedSceneIDs = []; lastSelectedSceneID = nil }
+                            .buttonStyle(.plain)
                             .font(.caption).foregroundColor(.secondary)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2).foregroundColor(.secondary)
                     }
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+
+                HStack {
+                    if !selectedSceneIDs.isEmpty {
+                        Text("· \(selectedSceneIDs.count) \(L("selected"))")
+                            .font(.caption).fontWeight(.medium)
+                            .foregroundColor(currentTheme.primaryAccent(isDarkMode: isDarkMode))
+                    }
+                    Spacer()
+                    Menu {
+                        Button(L("Show Order"))    { boneyardSort = .showOrder }
+                        Button(L("Default"))       { boneyardSort = .defaultOrder }
+                        Button(L("Location"))      { boneyardSort = .location }
+                        Button(L("INT/EXT"))       { boneyardSort = .intExt }
+                        Button(L("Cast"))          { boneyardSort = .cast }
+                        Button(L("Day/Night"))     { boneyardSort = .dayNight }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(boneyardSortLabel)
+                            Image(systemName: "chevron.down").font(.caption2)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    .menuStyle(.borderlessButton)
+                }
             }
 
             Text("⌘-click or ⇧-click to select multiple, then drag as a group")
@@ -467,8 +492,9 @@ struct ContentView: View {
             boneyardList
                 .frame(maxHeight: .infinity)
         }
-        .padding()
+        .padding(10)
         .frame(minWidth: 300, maxHeight: .infinity)
+        .background(currentTheme.panelBackground(isDarkMode: isDarkMode))
     }
 
     // MARK: - Boneyard sort & conflict helpers
@@ -592,12 +618,12 @@ struct ContentView: View {
 
     private var boneyardSortLabel: String {
         switch boneyardSort {
-        case .showOrder:    return "Show Order"
-        case .defaultOrder: return "Default"
-        case .location:     return "Location"
-        case .intExt:       return "INT/EXT"
-        case .cast:         return "Cast"
-        case .dayNight:     return "Day/Night"
+        case .showOrder:    return L("Show Order")
+        case .defaultOrder: return L("Default")
+        case .location:     return L("Location")
+        case .intExt:       return L("INT/EXT")
+        case .cast:         return L("Cast")
+        case .dayNight:     return L("Day/Night")
         }
     }
 
@@ -661,44 +687,60 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Boneyard list
+    // MARK: - Boneyard list (Movie Magic strip styling)
 
     private var boneyardList: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(spacing: 2) {
                 ForEach(sortedScenes, id: \.scene.id) { item in
                     let isDup = duplicateSceneNumberIDs.contains(item.scene.id)
-                    HStack {
-                        Circle().fill(item.scene.dayNightType.color).frame(width: 8, height: 8)
-                        Text(item.scene.displayTitle)
-                            .lineLimit(1)
-                        if isDup {
-                            Image(systemName: "number.square.fill")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .help("Duplicate scene number '\(item.scene.sceneNumber)' — another scene uses it too.")
+                    HStack(spacing: 6) {
+                        if !item.scene.sceneNumber.isEmpty {
+                            Text(item.scene.sceneNumber)
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(item.scene.stripTextColor.opacity(0.6))
+                                .lineLimit(1)
+                                .frame(minWidth: 18, alignment: .leading)
                         }
-                        Spacer()
-                        Text(item.scene.dayNightType.shortCode)
-                            .font(.caption).foregroundColor(item.scene.dayNightType.color).fontWeight(.semibold)
-                        Text("\(FractionParser.formatEighths(item.scene.duration)) / \(formattedTime(item.scene.estimatedTime))")
+
+                        Text(item.scene.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(item.scene.stripTextColor)
+                            .lineLimit(1)
+
+                        if isDup {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(.red)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Text(FractionParser.formatEighths(item.scene.duration))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(item.scene.stripTextColor.opacity(0.7))
+
                         Button {
                             captureUndoSnapshot()
                             allScenes.remove(at: item.index)
                             markDirty()
                         } label: {
-                            Image(systemName: "trash").foregroundColor(.red).help("Delete Scene")
+                            Image(systemName: "trash")
+                                .font(.system(size: 10))
+                                .foregroundColor(item.scene.stripTextColor.opacity(0.5))
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.vertical, 3).padding(.horizontal, 4)
+                    .padding(.vertical, 4).padding(.horizontal, 6)
                     .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(selectedSceneIDs.contains(item.scene.id) ? Color.accentColor.opacity(0.22) : Color.white.opacity(0.001))
+                    .background(item.scene.stripColor)
+                    .cornerRadius(3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(selectedSceneIDs.contains(item.scene.id) ? Color.accentColor : item.scene.stripTextColor.opacity(0.2), lineWidth: selectedSceneIDs.contains(item.scene.id) ? 2 : 0.5)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 3)
                             .strokeBorder(Color.red, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                             .opacity(isDup ? 1 : 0)
                     )
@@ -717,12 +759,12 @@ struct ContentView: View {
                         }
                     )
                     .contextMenu {
-                        Button("Edit Scene") {
+                        Button(L("Edit Scene")) {
                             editingUnscheduledSceneIndex = item.index
                             editingUnscheduledScene      = item.scene
                             activeSheet = .unscheduledEdit
                         }
-                        Button("Duplicate Scene") {
+                        Button(L("Duplicate Scene")) {
                             captureUndoSnapshot()
                             allScenes.append(Scene(
                                 title:            item.scene.title + " (Copy)",
@@ -747,15 +789,15 @@ struct ContentView: View {
                             markDirty()
                         }
                         Divider()
-                        Button("Delete Scene", role: .destructive) {
+                        Button(L("Delete Scene"), role: .destructive) {
                             captureUndoSnapshot()
                             allScenes.remove(at: item.index)
                             markDirty()
                         }
                     }
-                    Divider()
                 }
             }
+            .padding(4)
         }
         .tooltipContainer()
         .onDrop(of: [UTType.text.identifier], isTargeted: nil) { providers in
@@ -860,7 +902,8 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .padding(10)
+        .background(currentTheme.canvasBackground(isDarkMode: isDarkMode))
     }
 
     // MARK: - Toolbar row
@@ -868,9 +911,9 @@ struct ContentView: View {
     private var toolbarRow: some View {
         HStack {
             Text(projectTitle.isEmpty ? "Untitled Movie" : projectTitle)
-                .font(.headline).fontWeight(.semibold)
+                .font(.headline).fontWeight(.bold)
                 .lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: 200)
+                .frame(maxWidth: 220)
 
             Divider().frame(height: 20)
 
@@ -885,18 +928,39 @@ struct ContentView: View {
 
             Spacer()
 
-            Picker("", selection: $viewMode) {
+            // Custom View Mode Switcher pill styled with currentTheme.activeTabColor
+            HStack(spacing: 2) {
                 ForEach(ScheduleViewMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Button {
+                        viewMode = mode
+                    } label: {
+                        Text(mode.localizedTitle)
+                            .font(.caption).fontWeight(.semibold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .foregroundColor(viewMode == mode ? .white : .primary)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(viewMode == mode
+                                        ? currentTheme.activeTabColor(isDarkMode: isDarkMode)
+                                        : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 170)
+            .padding(3)
+            .background(Color.gray.opacity(0.18))
+            .cornerRadius(8)
 
             scheduleSearchField
         }
-        .padding(.bottom)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(currentTheme.panelBackground(isDarkMode: isDarkMode))
+        )
+        .padding(.bottom, 6)
     }
 
     // MARK: - Schedule search
@@ -991,14 +1055,16 @@ struct ContentView: View {
     }
 
     private func statBadge(icon: String, value: String, label: String?, color: Color) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Image(systemName: icon).foregroundColor(color).font(.caption)
             Text(value)
                 .font(.system(.body, design: .rounded)).fontWeight(.semibold).foregroundColor(color)
             if let label = label {
-                Text(label).font(.caption).foregroundColor(.secondary)
+                Text(L(label)).font(.caption).foregroundColor(.secondary)
             }
         }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: true)
     }
 
     // MARK: - Unscheduled scene edit sheet
@@ -1205,5 +1271,29 @@ fileprivate struct ScheduleSearchResultRow: View {
     private var subtitle: String {
         guard let date = result.dayDate else { return "Boneyard (unscheduled)" }
         return formattedDate(date)
+    }
+}
+
+fileprivate struct WindowAccessor: NSViewRepresentable {
+    let backgroundColor: Color
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.titlebarAppearsTransparent = true
+                window.backgroundColor = NSColor(backgroundColor)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let window = nsView.window {
+                window.titlebarAppearsTransparent = true
+                window.backgroundColor = NSColor(backgroundColor)
+            }
+        }
     }
 }

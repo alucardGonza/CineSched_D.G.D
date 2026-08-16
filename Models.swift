@@ -244,49 +244,44 @@ struct Scene: Identifiable, Codable, Hashable {
 
     /// Movie Magic Scheduling's own strip color code:
     /// white = day interior, yellow = day exterior, green = night interior,
-    /// blue = night exterior, rose/gold for dawn/afternoon/dusk. A scene with no scene number is treated as a
-    /// notice strip (e.g. "DOWN FOR THANKSGIVING") rather than a real scene —
-    /// those go black. Colors are mixed 10% toward white — softer than the
-    /// literal paper-strip hues, while still reading as the same colors at a
-    /// glance.
-    var stripColor: Color {
-        let base: Color
-        if sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty {
-            base = .black
-        } else if dayNightType == .custom {
-            base = Color(white: 0.75)
-        } else {
-            switch (intExt, dayNightType) {
-            case (.interior, .day):       base = .white
-            case (.exterior, .day):       base = .yellow
-            case (.interior, .night):     base = .green
-            case (.exterior, .night):     base = .blue
-            case (.interior, .dawn):      base = Color(red: 0.95, green: 0.85, blue: 0.90)
-            case (.exterior, .dawn):      base = Color(red: 1.0,  green: 0.88, blue: 0.70)
-            case (.interior, .dusk):      base = Color(red: 0.85, green: 0.80, blue: 0.95)
-            case (.exterior, .dusk):      base = Color(red: 0.75, green: 0.70, blue: 0.90)
-            case (.interior, .afternoon): base = Color(red: 1.0,  green: 0.92, blue: 0.80)
-            case (.exterior, .afternoon): base = Color(red: 1.0,  green: 0.80, blue: 0.60)
-            case (.unknown, .day):        base = .white
-            case (.unknown, .night):      base = .blue
-            case (.unknown, .dawn):       base = Color(red: 0.95, green: 0.85, blue: 0.90)
-            case (.unknown, .dusk):       base = Color(red: 0.85, green: 0.80, blue: 0.95)
-            case (.unknown, .afternoon):  base = Color(red: 1.0,  green: 0.80, blue: 0.60)
-            case (_, .custom):            base = Color(white: 0.75)
-            }
-        }
-        return base.lightened(by: 0.1)
-    }
-
-    /// White for the black "no scene number" notice-strip treatment, black
-    /// for every normal color-coded strip — keeps text readable against
-    /// whichever `stripColor` this scene gets.
-    var stripTextColor: Color {
-        sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty ? .white : .black
-    }
-
+    /// blue = night exterior, rose/gold for dawn/afternoon/dusk.
     var isNoticeStrip: Bool {
-        sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasNoNum = sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty
+        let titleHasNoHeading = !title.uppercased().contains("INT") && !title.uppercased().contains("EXT") && extractedSceneNumber == "1" && sceneNumber.isEmpty && duration == 0
+        return hasNoNum && titleHasNoHeading && dayNightType == .custom
+    }
+
+    var stripColor: Color {
+        if isNoticeStrip {
+            return .black
+        }
+        if dayNightType == .custom {
+            return Color(white: 0.75)
+        }
+        let base: Color
+        switch (intExt, dayNightType) {
+        case (.interior, .day):       base = Color(white: 0.95) // Day Interior = White/Clean Gray
+        case (.exterior, .day):       base = Color(red: 1.0, green: 0.92, blue: 0.50) // Day Exterior = Yellow
+        case (.interior, .night):     base = Color(red: 0.60, green: 0.88, blue: 0.65) // Night Interior = Green
+        case (.exterior, .night):     base = Color(red: 0.60, green: 0.80, blue: 0.98) // Night Exterior = Blue
+        case (.interior, .dawn):      base = Color(red: 0.95, green: 0.85, blue: 0.90)
+        case (.exterior, .dawn):      base = Color(red: 1.0,  green: 0.88, blue: 0.70)
+        case (.interior, .dusk):      base = Color(red: 0.85, green: 0.80, blue: 0.95)
+        case (.exterior, .dusk):      base = Color(red: 0.75, green: 0.70, blue: 0.90)
+        case (.interior, .afternoon): base = Color(red: 1.0,  green: 0.92, blue: 0.80)
+        case (.exterior, .afternoon): base = Color(red: 1.0,  green: 0.80, blue: 0.60)
+        case (.unknown, .day):        base = Color(white: 0.95)
+        case (.unknown, .night):      base = Color(red: 0.60, green: 0.80, blue: 0.98)
+        case (.unknown, .dawn):       base = Color(red: 0.95, green: 0.85, blue: 0.90)
+        case (.unknown, .dusk):       base = Color(red: 0.85, green: 0.80, blue: 0.95)
+        case (.unknown, .afternoon):  base = Color(red: 1.0,  green: 0.80, blue: 0.60)
+        case (_, .custom):            base = Color(white: 0.75)
+        }
+        return base
+    }
+
+    var stripTextColor: Color {
+        isNoticeStrip ? .white : .black
     }
 
     /// Splits a raw scene number like "12A" into its numeric and letter parts.
@@ -319,17 +314,19 @@ struct CastCallEntry: Identifiable, Codable, Hashable {
     let id: UUID
     var characterName: String
     var actorName: String
+    var sceneNumbers: String     // e.g. "1, 4, 7"
     var ecdt: String             // "E", "ET", "W", etc.
-    var pickupTime: String       // e.g. "7:00"
-    var hmuWardrobeTime: String  // e.g. "7:30"
-    var onSetTime: String        // e.g. "8:00"
-    var wrapTime: String         // e.g. "21:30"
+    var pickupTime: String       // e.g. "07:00 AM"
+    var hmuWardrobeTime: String  // e.g. "07:30 AM"
+    var onSetTime: String        // e.g. "08:00 AM"
+    var wrapTime: String         // e.g. "09:30 PM"
     var locationIndex: String    // e.g. "1", "2"
 
     init(
         id: UUID = UUID(),
         characterName: String = "",
         actorName: String = "",
+        sceneNumbers: String = "",
         ecdt: String = "E",
         pickupTime: String = "",
         hmuWardrobeTime: String = "",
@@ -340,12 +337,31 @@ struct CastCallEntry: Identifiable, Codable, Hashable {
         self.id = id
         self.characterName = characterName
         self.actorName = actorName
+        self.sceneNumbers = sceneNumbers
         self.ecdt = ecdt
         self.pickupTime = pickupTime
         self.hmuWardrobeTime = hmuWardrobeTime
         self.onSetTime = onSetTime
         self.wrapTime = wrapTime
         self.locationIndex = locationIndex
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, characterName, actorName, sceneNumbers, ecdt, pickupTime, hmuWardrobeTime, onSetTime, wrapTime, locationIndex
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id              = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        characterName   = try c.decodeIfPresent(String.self, forKey: .characterName) ?? ""
+        actorName       = try c.decodeIfPresent(String.self, forKey: .actorName) ?? ""
+        sceneNumbers    = try c.decodeIfPresent(String.self, forKey: .sceneNumbers) ?? ""
+        ecdt            = try c.decodeIfPresent(String.self, forKey: .ecdt) ?? "E"
+        pickupTime      = try c.decodeIfPresent(String.self, forKey: .pickupTime) ?? ""
+        hmuWardrobeTime = try c.decodeIfPresent(String.self, forKey: .hmuWardrobeTime) ?? ""
+        onSetTime       = try c.decodeIfPresent(String.self, forKey: .onSetTime) ?? ""
+        wrapTime        = try c.decodeIfPresent(String.self, forKey: .wrapTime) ?? ""
+        locationIndex   = try c.decodeIfPresent(String.self, forKey: .locationIndex) ?? "1"
     }
 }
 
@@ -377,7 +393,7 @@ struct CrewCallEntry: Identifiable, Codable, Hashable {
 
 struct CallSheetData: Codable {
     var generalCallTime: String
-    var workDaySchedule: String       // e.g. "Jornada de 7:30 a 21:30 h"
+    var workDaySchedule: String       // e.g. "Schedule: 07:30 AM to 09:30 PM"
     var readyToShootTime: String      // e.g. "08:00 AM"
     var lunchTime: String             // e.g. "01:30 PM"
     var snackTime: String             // Merienda, e.g. "05:00 PM"
@@ -389,6 +405,7 @@ struct CallSheetData: Codable {
     var weatherCondition: String
     var weatherPrecipWind: String
     var sunTimes: String
+    var basecampLocation: String      // Basecamp location / address
     var nearestHospital: String
     var castCallEntries: [CastCallEntry]
     var crewCallEntries: [CrewCallEntry]
@@ -414,6 +431,7 @@ struct CallSheetData: Codable {
         weatherCondition: String    = "",
         weatherPrecipWind: String   = "",
         sunTimes: String            = "",
+        basecampLocation: String    = "",
         nearestHospital: String     = "",
         castCallEntries: [CastCallEntry] = [],
         crewCallEntries: [CrewCallEntry] = [],
@@ -438,6 +456,7 @@ struct CallSheetData: Codable {
         self.weatherCondition   = weatherCondition
         self.weatherPrecipWind  = weatherPrecipWind
         self.sunTimes           = sunTimes
+        self.basecampLocation   = basecampLocation
         self.nearestHospital    = nearestHospital
         self.castCallEntries    = castCallEntries
         self.crewCallEntries    = crewCallEntries
@@ -452,7 +471,7 @@ struct CallSheetData: Codable {
 
     enum CodingKeys: String, CodingKey {
         case generalCallTime, workDaySchedule, readyToShootTime, lunchTime, snackTime, dinnerTime
-        case quoteOfTheDay, prodManagerContact, adContact, weatherTemp, weatherCondition, weatherPrecipWind, sunTimes, nearestHospital
+        case quoteOfTheDay, prodManagerContact, adContact, weatherTemp, weatherCondition, weatherPrecipWind, sunTimes, basecampLocation, nearestHospital
         case castCallEntries, crewCallEntries, productionNotes, locations, castOverride, crewOverride, crewIDOverride, crewOneOffs, notes
     }
 
@@ -471,6 +490,7 @@ struct CallSheetData: Codable {
         weatherCondition   = try c.decodeIfPresent(String.self, forKey: .weatherCondition) ?? ""
         weatherPrecipWind  = try c.decodeIfPresent(String.self, forKey: .weatherPrecipWind) ?? ""
         sunTimes           = try c.decodeIfPresent(String.self, forKey: .sunTimes) ?? ""
+        basecampLocation   = try c.decodeIfPresent(String.self, forKey: .basecampLocation) ?? ""
         nearestHospital    = try c.decodeIfPresent(String.self, forKey: .nearestHospital) ?? ""
         castCallEntries    = try c.decodeIfPresent([CastCallEntry].self, forKey: .castCallEntries) ?? []
         crewCallEntries    = try c.decodeIfPresent([CrewCallEntry].self, forKey: .crewCallEntries) ?? []

@@ -1,27 +1,30 @@
 // CallSheetEditor.swift
-// Per-day call sheet editor — configured with all production info,
-// cast calls, crew calls, weather, meal milestones, locations, quote of the day, and notes.
+// Per-day call sheet editor with basecamp location, scene numbers per actor,
+// cast calls, crew calls, weather, meal milestones, locations, and general notes.
 
 import SwiftUI
 
 struct CallSheetEditor: View {
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var shootDay: ShootDay
     let productionInfo: ProductionInfo
     @Binding var isPresented: Bool
     let onSave: () -> Void
     let onExportPDF: (ShootDay) -> Void
-    var dayNumber: Int? = nil
-    var totalProductionDays: Int = 0
+    let dayNumber: Int?
+    let totalProductionDays: Int
 
-    // Tab / Category selection (All in English)
-    enum EditorSection: String, CaseIterable {
-        case general    = "General & Schedule"
-        case weather    = "Weather"
-        case locations  = "Locations"
-        case cast       = "Cast"
-        case crew       = "Crew"
-        case notes      = "General Notes"
+    private enum EditorSection: String, CaseIterable {
+        case general   = "General & Schedule"
+        case weather   = "Weather"
+        case locations = "Locations"
+        case cast      = "Cast"
+        case crew      = "Crew"
+        case notes     = "General Notes"
     }
+
     @State private var currentSection: EditorSection = .general
 
     // General & Milestones
@@ -34,13 +37,14 @@ struct CallSheetEditor: View {
     @State private var dinnerTime:       String = ""
     @State private var nearestHospital:  String = ""
 
-    // Weather (with empty defaults, placeholders only)
+    // Weather
     @State private var weatherTemp:       String = ""
     @State private var weatherCondition:  String = ""
     @State private var weatherPrecipWind: String = ""
     @State private var sunTimes:          String = ""
 
-    // Locations
+    // Locations & Basecamp
+    @State private var basecampLocation:   String = ""
     @State private var locations: [Location] = []
     @State private var newLocationName:    String = ""
     @State private var newLocationAddress: String = ""
@@ -67,10 +71,10 @@ struct CallSheetEditor: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        Text(dayNumber != nil ? "Call Sheet #\(String(format: "%02d", dayNumber!))" : "Call Sheet")
+                        Text(dayNumber != nil ? "\(L("Call Sheet")) #\(String(format: "%02d", dayNumber!))" : L("Call Sheet"))
                             .font(.title2).fontWeight(.bold)
                         if let dayNumber {
-                            Text("Day \(dayNumber) of \(totalProductionDays)")
+                            Text("\(L("Day")) \(dayNumber) \(L("of")) \(totalProductionDays)")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)
                         }
                     }
@@ -88,7 +92,7 @@ struct CallSheetEditor: View {
             // Section Picker
             Picker("", selection: $currentSection) {
                 ForEach(EditorSection.allCases, id: \.self) { section in
-                    Text(section.rawValue).tag(section)
+                    Text(L(section.rawValue)).tag(section)
                 }
             }
             .pickerStyle(.segmented)
@@ -123,7 +127,7 @@ struct CallSheetEditor: View {
 
             // Footer
             HStack(spacing: 12) {
-                Button("Export PDF") {
+                Button(L("Export PDF")) {
                     saveToDay()
                     onExportPDF(shootDay)
                 }
@@ -132,10 +136,10 @@ struct CallSheetEditor: View {
 
                 Spacer()
 
-                Button("Cancel") { isPresented = false }
+                Button(L("Cancel")) { isPresented = false }
                     .buttonStyle(.bordered)
 
-                Button("Save") {
+                Button(L("Save")) {
                     saveToDay()
                     onSave()
                     isPresented = false
@@ -144,59 +148,61 @@ struct CallSheetEditor: View {
             }
             .padding(20)
         }
-        .frame(width: 720, height: 750)
+        .frame(width: 780, height: 750)
         .onAppear { populateFields() }
     }
 
     // MARK: - Section 1: General & Schedule
 
+    // MARK: - Section 1: General & Schedule
+
     private var generalAndMilestonesView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("General Call & Schedule", systemImage: "clock.badge.checkmark").font(.headline)
+            Label(L("General Call & Schedule"), systemImage: "clock.badge.checkmark").font(.headline)
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("General Call (12h)").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("General Call (12h)")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 07:30 AM", text: $generalCallTime)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Schedule").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Estimated Schedule")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 07:30 AM to 09:30 PM", text: $workDaySchedule)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Quote of the day").font(.subheadline).foregroundColor(.secondary)
+                Text(L("Quote of the day")).font(.subheadline).foregroundColor(.secondary)
                 TextField("e.g. \"Every great film begins with a great schedule.\"", text: $quoteOfTheDay)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
             }
 
             Divider()
 
-            Label("Milestones & Meal Times (12h format)", systemImage: "timer").font(.headline)
-            Text("Set ready time, meals, and estimated wrap time.")
+            Label(L("Milestones & Meal Times (12h format)"), systemImage: "timer").font(.headline)
+            Text(L("Set ready time, meals, and estimated wrap time."))
                 .font(.caption).foregroundColor(.secondary)
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
-                    Text("Ready to Shoot (On Set):").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Ready to Shoot (On Set):")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 08:00 AM", text: $readyToShootTime).textFieldStyle(RoundedBorderTextFieldStyle())
-                    Text("Lunch:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Lunch:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 01:30 PM", text: $lunchTime).textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 GridRow {
-                    Text("Snack:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Snack:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 05:00 PM", text: $snackTime).textFieldStyle(RoundedBorderTextFieldStyle())
-                    Text("Wrap:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Wrap:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 09:30 PM", text: $dinnerTime).textFieldStyle(RoundedBorderTextFieldStyle())
                 }
             }
 
             Divider()
 
-            Label("Nearest Hospital (for this day)", systemImage: "cross.case").font(.headline)
+            Label(L("Nearest Hospital"), systemImage: "cross.case").font(.headline)
             TextField("Hospital name, address, emergency phone number", text: $nearestHospital)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
         }
@@ -206,36 +212,47 @@ struct CallSheetEditor: View {
 
     private var weatherView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Weather Forecast & Sun Times", systemImage: "cloud.sun").font(.headline)
-            Text("Fill in weather details for this day. Left blank if not needed.")
+            Label(L("Weather Forecast & Sun Times"), systemImage: "cloud.sun").font(.headline)
+            Text(L("Fill in weather details for this day. Left blank if not needed."))
                 .font(.caption).foregroundColor(.secondary)
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
-                    Text("Temperature:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Temperature:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 68°F - 55°F / 15°C - 12°C", text: $weatherTemp).textFieldStyle(RoundedBorderTextFieldStyle())
-                    Text("Sky Condition:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Sky Condition:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. Partly cloudy", text: $weatherCondition).textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 GridRow {
-                    Text("Precipitation & Wind:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Precipitation & Wind:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. Rain: 10%, Wind: 10 km/h", text: $weatherPrecipWind).textFieldStyle(RoundedBorderTextFieldStyle())
-                    Text("Sunrise / Sunset:").font(.subheadline).foregroundColor(.secondary)
+                    Text(L("Sunrise / Sunset:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. SUNRISE: 06:45 AM / SUNSET: 07:30 PM", text: $sunTimes).textFieldStyle(RoundedBorderTextFieldStyle())
                 }
             }
         }
     }
 
-    // MARK: - Section 3: Locations
+    // MARK: - Section 3: Locations & Basecamp
 
     private var locationsView: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Basecamp section
+            VStack(alignment: .leading, spacing: 4) {
+                Label(L("Basecamp Location / Address"), systemImage: "tent").font(.headline)
+                TextField("e.g. Parking Basecamp — 123 Studio Way, Lot B", text: $basecampLocation)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Text(L("Appears prominently on the call sheet above the hospital."))
+                    .font(.caption).foregroundColor(.secondary)
+            }
+
+            Divider()
+
             HStack {
-                Label("Today's Locations", systemImage: "mappin.and.ellipse").font(.headline)
+                Label(L("Today's Shooting Locations"), systemImage: "mappin.and.ellipse").font(.headline)
                 Spacer()
                 if !availableRosterLocations.isEmpty {
-                    Menu("+ Add from Roster") {
+                    Menu(L("+ Add from Roster")) {
                         ForEach(availableRosterLocations) { loc in
                             Button(loc.name) {
                                 locations.append(loc)
@@ -246,7 +263,7 @@ struct CallSheetEditor: View {
                 }
             }
 
-            Text("Each location is assigned a number (LOC 1, LOC 2...) and will appear on scene and cast breakdown tables.")
+            Text("Each location is assigned a number (LOC 1, LOC 2...) and appears on scene breakdown.")
                 .font(.caption).foregroundColor(.secondary)
 
             if locations.isEmpty {
@@ -314,28 +331,26 @@ struct CallSheetEditor: View {
     private var castCallTableView: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("Cast Call Times", systemImage: "person.crop.rectangle.stack").font(.headline)
+                Label(L("Cast Call Times"), systemImage: "person.crop.rectangle.stack").font(.headline)
                 Spacer()
-                Button("Auto-populate from Scenes") {
+                Button(L("+ Auto-populate from Scenes")) {
                     populateCastFromScenes()
                 }
                 .buttonStyle(.bordered)
-                .help("Pulls all characters scheduled today with their assigned actors")
+                .help("Pulls all characters scheduled today with their assigned actors and scene numbers")
             }
-
-            Text("Set status (ECDT: E, ET, W), pickup time, wardrobe/HMU, on set, wrap, and location index.")
-                .font(.caption).foregroundColor(.secondary)
 
             // Table Header
             HStack(spacing: 4) {
-                Text("Character").font(.caption2).fontWeight(.bold).frame(width: 90, alignment: .leading)
-                Text("Actor/Actress").font(.caption2).fontWeight(.bold).frame(width: 110, alignment: .leading)
-                Text("Status").font(.caption2).fontWeight(.bold).frame(width: 44, alignment: .center)
-                Text("Pick Up").font(.caption2).fontWeight(.bold).frame(width: 65, alignment: .center)
-                Text("H/MU").font(.caption2).fontWeight(.bold).frame(width: 65, alignment: .center)
-                Text("On Set").font(.caption2).fontWeight(.bold).frame(width: 65, alignment: .center)
-                Text("Wrap").font(.caption2).fontWeight(.bold).frame(width: 65, alignment: .center)
-                Text("Loc").font(.caption2).fontWeight(.bold).frame(width: 36, alignment: .center)
+                Text(L("CHARACTER")).font(.caption2).fontWeight(.bold).frame(width: 85, alignment: .leading)
+                Text(L("ACTOR/ACTRESS")).font(.caption2).fontWeight(.bold).frame(width: 105, alignment: .leading)
+                Text(L("SCENES")).font(.caption2).fontWeight(.bold).frame(width: 55, alignment: .center)
+                Text(L("STATUS")).font(.caption2).fontWeight(.bold).frame(width: 38, alignment: .center)
+                Text(L("PICK UP")).font(.caption2).fontWeight(.bold).frame(width: 60, alignment: .center)
+                Text(L("H/MU")).font(.caption2).fontWeight(.bold).frame(width: 60, alignment: .center)
+                Text(L("ON SET")).font(.caption2).fontWeight(.bold).frame(width: 60, alignment: .center)
+                Text(L("WRAP")).font(.caption2).fontWeight(.bold).frame(width: 60, alignment: .center)
+                Text(L("LOC")).font(.caption2).fontWeight(.bold).frame(width: 34, alignment: .center)
                 Spacer()
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -343,66 +358,73 @@ struct CallSheetEditor: View {
             .cornerRadius(4)
 
             if castCallEntries.isEmpty {
-                Text("No cast members listed. Click 'Auto-populate from Scenes' or add one below.")
+                Text(L("No cast members listed. Click 'Auto-populate from Scenes' or add one below."))
                     .font(.caption).foregroundColor(.secondary).padding(.vertical, 8)
             } else {
                 ForEach(Array(castCallEntries.enumerated()), id: \.element.id) { index, entry in
                     HStack(spacing: 4) {
-                        TextField("Character", text: Binding(
+                        TextField(L("CHARACTER"), text: Binding(
                             get: { castCallEntries[index].characterName },
                             set: { castCallEntries[index].characterName = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 90)
+                        .frame(width: 85)
 
-                        TextField("Actor", text: Binding(
+                        TextField(L("ACTOR"), text: Binding(
                             get: { castCallEntries[index].actorName },
                             set: { castCallEntries[index].actorName = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 110)
+                        .frame(width: 105)
+
+                        TextField("1, 4", text: Binding(
+                            get: { castCallEntries[index].sceneNumbers },
+                            set: { castCallEntries[index].sceneNumbers = $0 }
+                        ))
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(width: 55)
 
                         TextField("E", text: Binding(
                             get: { castCallEntries[index].ecdt },
                             set: { castCallEntries[index].ecdt = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 44)
+                        .frame(width: 38)
 
                         TextField("07:00 AM", text: Binding(
                             get: { castCallEntries[index].pickupTime },
                             set: { castCallEntries[index].pickupTime = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 65)
+                        .frame(width: 60)
 
                         TextField("07:30 AM", text: Binding(
                             get: { castCallEntries[index].hmuWardrobeTime },
                             set: { castCallEntries[index].hmuWardrobeTime = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 65)
+                        .frame(width: 60)
 
                         TextField("08:00 AM", text: Binding(
                             get: { castCallEntries[index].onSetTime },
                             set: { castCallEntries[index].onSetTime = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 65)
+                        .frame(width: 60)
 
                         TextField("09:30 PM", text: Binding(
                             get: { castCallEntries[index].wrapTime },
                             set: { castCallEntries[index].wrapTime = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 65)
+                        .frame(width: 60)
 
                         TextField("1", text: Binding(
                             get: { castCallEntries[index].locationIndex },
                             set: { castCallEntries[index].locationIndex = $0 }
                         ))
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 36)
+                        .frame(width: 34)
 
                         Button { castCallEntries.remove(at: index) } label: {
                             Image(systemName: "minus.circle").foregroundColor(.red)
@@ -414,16 +436,22 @@ struct CallSheetEditor: View {
 
             // Add Cast Member
             HStack(spacing: 8) {
-                TextField("New Character", text: $newCastCharacter)
+                TextField(L("Character"), text: $newCastCharacter)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                TextField("Actor / Actress", text: $newCastActor)
+                TextField(L("Actor Name"), text: $newCastActor)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                 Button {
                     let char = newCastCharacter.trimmingCharacters(in: .whitespaces)
                     guard !char.isEmpty else { return }
+                    
+                    let scenesForChar = shootDay.scenes.filter { scene in
+                        scene.cast.contains(where: { $0.caseInsensitiveCompare(char) == .orderedSame })
+                    }.map { $0.extractedSceneNumber }.joined(separator: ", ")
+
                     castCallEntries.append(CastCallEntry(
                         characterName: char,
                         actorName: newCastActor.trimmingCharacters(in: .whitespaces),
+                        sceneNumbers: scenesForChar,
                         ecdt: "E",
                         pickupTime: "",
                         hmuWardrobeTime: "",
@@ -445,14 +473,26 @@ struct CallSheetEditor: View {
     private func populateCastFromScenes() {
         let chars = shootDay.allCast
         for char in chars {
-            if !castCallEntries.contains(where: { $0.characterName.caseInsensitiveCompare(char) == .orderedSame }) {
-                let matchedActor = productionInfo.castList.first(where: {
-                    $0.characterName.caseInsensitiveCompare(char) == .orderedSame
-                })?.actorName ?? ""
+            let matchedActor = productionInfo.castList.first(where: {
+                $0.characterName.caseInsensitiveCompare(char) == .orderedSame
+            })?.actorName ?? ""
 
+            let scenesForChar = shootDay.scenes.filter { scene in
+                scene.cast.contains(where: { $0.caseInsensitiveCompare(char) == .orderedSame })
+            }.map { $0.extractedSceneNumber }.joined(separator: ", ")
+
+            if let existingIdx = castCallEntries.firstIndex(where: { $0.characterName.caseInsensitiveCompare(char) == .orderedSame }) {
+                if castCallEntries[existingIdx].sceneNumbers.isEmpty {
+                    castCallEntries[existingIdx].sceneNumbers = scenesForChar
+                }
+                if castCallEntries[existingIdx].actorName.isEmpty {
+                    castCallEntries[existingIdx].actorName = matchedActor
+                }
+            } else {
                 castCallEntries.append(CastCallEntry(
                     characterName: char,
                     actorName: matchedActor,
+                    sceneNumbers: scenesForChar,
                     ecdt: "E",
                     pickupTime: "",
                     hmuWardrobeTime: "",
@@ -469,24 +509,21 @@ struct CallSheetEditor: View {
     private var crewCallTableView: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("Crew Call Times", systemImage: "person.3").font(.headline)
+                Label(L("CREW CALL TIMES"), systemImage: "person.3").font(.headline)
                 Spacer()
-                Button("Load Crew from Setup") {
+                Button(L("Load Crew from Setup")) {
                     populateCrewFromProductionInfo()
                 }
                 .buttonStyle(.bordered)
                 .help("Loads all crew members from Production Setup with their roles and phone numbers")
             }
 
-            Text("The Call Sheet PDF displays both the person's Name and their Crew Role together.")
-                .font(.caption).foregroundColor(.secondary)
-
             // Table Header
             HStack(spacing: 6) {
-                Text("Role / Function").font(.caption2).fontWeight(.bold).frame(width: 140, alignment: .leading)
-                Text("Name").font(.caption2).fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
-                Text("Call Time").font(.caption2).fontWeight(.bold).frame(width: 95, alignment: .leading)
-                Text("Phone").font(.caption2).fontWeight(.bold).frame(width: 110, alignment: .leading)
+                Text(L("DEPARTMENT / ROLE")).font(.caption2).fontWeight(.bold).frame(width: 140, alignment: .leading)
+                Text(L("NAME")).font(.caption2).fontWeight(.bold).frame(maxWidth: .infinity, alignment: .leading)
+                Text(L("CALL TIME")).font(.caption2).fontWeight(.bold).frame(width: 95, alignment: .leading)
+                Text(L("PHONE")).font(.caption2).fontWeight(.bold).frame(width: 110, alignment: .leading)
                 Spacer().frame(width: 24)
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -574,7 +611,7 @@ struct CallSheetEditor: View {
                 crewCallEntries.append(CrewCallEntry(
                     role: member.role,
                     name: member.name,
-                    callTime: generalCallTime,
+                    callTime: generalCallTime.isEmpty ? "07:30 AM" : generalCallTime,
                     phone: member.phone
                 ))
             }
@@ -613,6 +650,7 @@ struct CallSheetEditor: View {
         snackTime          = shootDay.callSheet.snackTime
         dinnerTime         = shootDay.callSheet.dinnerTime
         nearestHospital    = shootDay.callSheet.nearestHospital
+        basecampLocation   = shootDay.callSheet.basecampLocation
 
         weatherTemp       = shootDay.callSheet.weatherTemp
         weatherCondition  = shootDay.callSheet.weatherCondition
@@ -640,6 +678,17 @@ struct CallSheetEditor: View {
         castCallEntries   = shootDay.callSheet.castCallEntries
         if castCallEntries.isEmpty {
             populateCastFromScenes()
+        } else {
+            // Update sceneNumbers for existing entries
+            for i in 0..<castCallEntries.count {
+                let char = castCallEntries[i].characterName
+                let scenesForChar = shootDay.scenes.filter { scene in
+                    scene.cast.contains(where: { $0.caseInsensitiveCompare(char) == .orderedSame })
+                }.map { $0.extractedSceneNumber }.joined(separator: ", ")
+                if castCallEntries[i].sceneNumbers.isEmpty {
+                    castCallEntries[i].sceneNumbers = scenesForChar
+                }
+            }
         }
 
         crewCallEntries = shootDay.callSheet.crewCallEntries
@@ -676,6 +725,7 @@ struct CallSheetEditor: View {
         shootDay.callSheet.lunchTime          = lunchTime
         shootDay.callSheet.snackTime          = snackTime
         shootDay.callSheet.dinnerTime         = dinnerTime
+        shootDay.callSheet.basecampLocation   = basecampLocation
         shootDay.callSheet.nearestHospital    = nearestHospital
         shootDay.callSheet.weatherTemp        = weatherTemp
         shootDay.callSheet.weatherCondition   = weatherCondition
