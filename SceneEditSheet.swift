@@ -31,6 +31,7 @@ struct SceneEditSheet: View {
     @State private var editLocationAddress: String      = ""
     @State private var editDuration:        String      = ""
     @State private var editEstimatedTime:   String      = ""
+    @State private var editCustomStartTime: String      = ""
     @State private var editDayNightType:    DayNightType = .day
     @State private var editCastText:        String      = ""   // comma-separated editing surface
     @State private var editSummary:         String      = ""
@@ -146,22 +147,29 @@ struct SceneEditSheet: View {
                     }
                 }
 
-                // Estimated Time
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Time").font(.headline)
-                    TextField(TimeParser.placeholderText, text: $editEstimatedTime)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .focused($focusedField, equals: .estimate)
-                        .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
-                        .onChange(of: editEstimatedTime) { _ in validateEstimatedTime() }
+                // Estimated Time & Custom Start Time
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Estimated Time").font(.headline)
+                        TextField(TimeParser.placeholderText, text: $editEstimatedTime)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .focused($focusedField, equals: .estimate)
+                            .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
+                            .onChange(of: editEstimatedTime) { _ in validateEstimatedTime() }
 
-                    if !estimatedTimeIsValid {
-                        Text("Invalid format. Use: 4 (4 hours), 15 (15 minutes), or 2:30 (2hr 30min)")
-                            .font(.caption).foregroundColor(.red)
-                    } else if let hint = TimeParser.getInputHint(editEstimatedTime), !editEstimatedTime.isEmpty {
-                        Text(hint).font(.caption).foregroundColor(.secondary)
-                    } else if editDayNightType == .custom {
-                        Text("Leave blank for no time estimate")
+                        if !estimatedTimeIsValid {
+                            Text("Invalid format. Use: 4 (4 hours), 15 (15 minutes), or 2:30 (2hr 30min)")
+                                .font(.caption).foregroundColor(.red)
+                        } else if let hint = TimeParser.getInputHint(editEstimatedTime), !editEstimatedTime.isEmpty {
+                            Text(hint).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Start Time (Optional)").font(.headline)
+                        TextField("e.g. 07:30 or 01:30 PM", text: $editCustomStartTime)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Text("Leave blank for auto-time")
                             .font(.caption).foregroundColor(.secondary)
                     }
                 }
@@ -298,12 +306,15 @@ struct SceneEditSheet: View {
     }
 
     private func populateFields() {
-        editSceneNumber      = scene.sceneNumber
-        editTitle            = scene.title
+        var tempScene = scene
+        tempScene.autoExtractSceneNumberIfNeeded()
+        editSceneNumber      = tempScene.sceneNumber
+        editTitle            = tempScene.title
         editRealLocation     = scene.realLocation
         editLocationAddress  = scene.locationAddress
         editDuration         = scene.duration > 0 ? FractionParser.formatEighths(scene.duration) : ""
         editEstimatedTime    = scene.estimatedTime > 0 ? formatMinutesForEditing(scene.estimatedTime) : ""
+        editCustomStartTime  = scene.customStartTime
         editDayNightType     = scene.dayNightType
         editCastText         = scene.cast.joined(separator: ", ")
         editSummary          = scene.summary
@@ -355,6 +366,7 @@ struct SceneEditSheet: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         scene.summary         = editSummary
+        scene.customStartTime = editCustomStartTime.trimmingCharacters(in: .whitespaces)
         if let d = FractionParser.parseToEighths(editDuration) { scene.duration      = d }
         else if editDayNightType == .custom                     { scene.duration      = 0 }
         if let t = TimeParser.parseToMinutes(editEstimatedTime) { scene.estimatedTime = t }

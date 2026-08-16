@@ -34,13 +34,23 @@ enum DayNightType: String, Codable, CaseIterable {
     case custom    = "CUSTOM"
 
     var color: Color {
+        color(isInterior: true)
+    }
+
+    func color(isInterior: Bool) -> Color {
         switch self {
-        case .day:       return Color.orange
-        case .night:     return Color.blue
-        case .dawn:      return Color(red: 0.96, green: 0.72, blue: 0.18)
-        case .dusk:      return Color(red: 0.65, green: 0.35, blue: 0.85)
-        case .afternoon: return Color(red: 0.90, green: 0.25, blue: 0.40)
-        case .custom:    return Color.green
+        case .day:
+            return isInterior ? Color(hex: "F3F4F6") : Color(hex: "FEF08A") // INT. DAY (Off-white) vs EXT. DAY (Yellow)
+        case .night:
+            return isInterior ? Color(hex: "86EFAC") : Color(hex: "93C5FD") // INT. NIGHT (Green) vs EXT. NIGHT (Blue)
+        case .dawn:
+            return Color(hex: "FDE68A") // DAWN / Amanecer (Gold)
+        case .dusk:
+            return Color(hex: "E9D5FF") // DUSK / Atardecer (Soft Lavender/Purple)
+        case .afternoon:
+            return isInterior ? Color(hex: "FFE4C4") : Color(hex: "FDBA74") // INT. TARDE vs EXT. TARDE (Warm Coral/Peach)
+        case .custom:
+            return Color(hex: "D1D5DB") // Custom / Notice (Gray)
         }
     }
 
@@ -69,10 +79,62 @@ enum DayNightType: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Banner & Meal Types
+
+enum BannerType: String, CaseIterable, Codable {
+    case companyMove = "Company Move"
+    case mealBreak   = "Meal Break"
+    case notice      = "Notice / Note"
+    case custom      = "Custom Banner"
+
+    var localizedName: String {
+        switch self {
+        case .companyMove: return L("Company Move")
+        case .mealBreak:   return L("Meal Break")
+        case .notice:      return L("Notice / Note")
+        case .custom:      return L("Custom Banner")
+        }
+    }
+
+    var defaultIcon: String {
+        switch self {
+        case .companyMove: return "truck.box.fill"
+        case .mealBreak:   return "fork.knife"
+        case .notice:      return "exclamationmark.triangle.fill"
+        case .custom:      return "flag.fill"
+        }
+    }
+}
+
+enum MealKind: String, CaseIterable, Codable {
+    case lunch  = "Lunch"
+    case snack  = "Snack"
+    case dinner = "Dinner"
+    case wrap   = "Wrap"
+
+    var icon: String {
+        switch self {
+        case .lunch:  return "🍽️"
+        case .snack:  return "☕"
+        case .dinner: return "🍕"
+        case .wrap:   return "🎬"
+        }
+    }
+
+    var defaultTitle: String {
+        switch self {
+        case .lunch:  return L("ALMUERZO / LUNCH")
+        case .snack:  return L("MERIENDA / SNACK")
+        case .dinner: return L("CENA / DINNER")
+        case .wrap:   return L("FIN DE RODAJE / WRAP")
+        }
+    }
+}
+
 // MARK: - Scene
 
 struct Scene: Identifiable, Codable, Hashable {
-    let id: UUID
+    var id: UUID
     var title: String
     var sceneNumber: String
     var duration: Int
@@ -96,11 +158,22 @@ struct Scene: Identifiable, Codable, Hashable {
     var vfx: [String]
     var breakdownNotes: String
 
+    // Banner & Auto-Meal Strip Extensions
+    var isBanner: Bool
+    var bannerType: BannerType?
+    var bannerTitle: String
+    var bannerNote: String
+    var bannerColorHex: String
+    var isAutoMeal: Bool
+    var mealKind: MealKind?
+    var isCalendarEvent: Bool
+    var customStartTime: String
+
     init(
         title: String,
         sceneNumber: String = "",
-        duration: Int,
-        estimatedTime: Int,
+        duration: Int = 0,
+        estimatedTime: Int = 0,
         dayNightType: DayNightType = .day,
         cast: [String] = [],
         summary: String = "",
@@ -116,7 +189,16 @@ struct Scene: Identifiable, Codable, Hashable {
         stunts: [String] = [],
         sfx: [String] = [],
         vfx: [String] = [],
-        breakdownNotes: String = ""
+        breakdownNotes: String = "",
+        isBanner: Bool = false,
+        bannerType: BannerType? = nil,
+        bannerTitle: String = "",
+        bannerNote: String = "",
+        bannerColorHex: String = "",
+        isAutoMeal: Bool = false,
+        mealKind: MealKind? = nil,
+        isCalendarEvent: Bool = false,
+        customStartTime: String = ""
     ) {
         self.id               = UUID()
         self.title            = title
@@ -139,12 +221,92 @@ struct Scene: Identifiable, Codable, Hashable {
         self.sfx              = sfx
         self.vfx              = vfx
         self.breakdownNotes   = breakdownNotes
+        self.isBanner         = isBanner
+        self.bannerType       = bannerType
+        self.bannerTitle      = bannerTitle
+        self.bannerNote       = bannerNote
+        self.bannerColorHex   = bannerColorHex
+        self.isAutoMeal       = isAutoMeal
+        self.mealKind         = mealKind
+        self.isCalendarEvent  = isCalendarEvent
+        self.customStartTime  = customStartTime
+    }
+
+    static func createBanner(type: BannerType, title: String, note: String = "", estimatedTime: String = "0:30", colorHex: String = "8B5CF6") -> Scene {
+        let estMin = parseMinutes(estimatedTime)
+        return Scene(
+            title: title,
+            sceneNumber: "",
+            duration: 0,
+            estimatedTime: estMin,
+            dayNightType: .custom,
+            summary: note,
+            isBanner: true,
+            bannerType: type,
+            bannerTitle: title,
+            bannerNote: note,
+            bannerColorHex: colorHex,
+            isAutoMeal: false,
+            mealKind: nil
+        )
+    }
+
+    static func createAutoMeal(kind: MealKind, timeString: String) -> Scene {
+        let title = "\(kind.icon) \(kind.defaultTitle) \(timeString.isEmpty ? "" : "(\(timeString))")"
+        return Scene(
+            title: title,
+            sceneNumber: "",
+            duration: 0,
+            estimatedTime: kind == .snack ? 15 : 60,
+            dayNightType: .custom,
+            summary: timeString,
+            isBanner: true,
+            bannerType: .mealBreak,
+            bannerTitle: title,
+            bannerNote: timeString,
+            bannerColorHex: "F59E0B",
+            isAutoMeal: true,
+            mealKind: kind
+        )
+    }
+
+    static func createCalendarEvent(title: String, time: String, colorHex: String = "6366F1") -> Scene {
+        let cleanTime = time.trimmingCharacters(in: .whitespaces)
+        let cleanTitle = title.trimmingCharacters(in: .whitespaces)
+        return Scene(
+            title: cleanTitle,
+            sceneNumber: "",
+            duration: 0,
+            estimatedTime: 0,
+            dayNightType: .custom,
+            summary: cleanTime,
+            isBanner: true,
+            bannerType: .notice,
+            bannerTitle: cleanTitle,
+            bannerNote: cleanTime,
+            bannerColorHex: colorHex,
+            isAutoMeal: false,
+            mealKind: nil,
+            isCalendarEvent: true,
+            customStartTime: cleanTime
+        )
+    }
+
+    private static func parseMinutes(_ raw: String) -> Int {
+        let parts = raw.components(separatedBy: ":")
+        if parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) {
+            return h * 60 + m
+        } else if let mins = Int(raw) {
+            return mins
+        }
+        return 30
     }
 
     enum CodingKeys: String, CodingKey {
         case id, title, sceneNumber, duration, estimatedTime, dayNightType, cast, summary
         case realLocation, locationAddress
         case extras, props, setDressing, wardrobe, makeupHair, vehicles, specialEquipment, stunts, sfx, vfx, breakdownNotes
+        case isBanner, bannerType, bannerTitle, bannerNote, bannerColorHex, isAutoMeal, mealKind, isCalendarEvent, customStartTime
     }
 
     init(from decoder: Decoder) throws {
@@ -178,6 +340,15 @@ struct Scene: Identifiable, Codable, Hashable {
         sfx              = try c.decodeIfPresent([String].self, forKey: .sfx) ?? []
         vfx              = try c.decodeIfPresent([String].self, forKey: .vfx) ?? []
         breakdownNotes   = try c.decodeIfPresent(String.self, forKey: .breakdownNotes) ?? ""
+        isBanner         = try c.decodeIfPresent(Bool.self, forKey: .isBanner) ?? false
+        bannerType       = try c.decodeIfPresent(BannerType.self, forKey: .bannerType)
+        bannerTitle      = try c.decodeIfPresent(String.self, forKey: .bannerTitle) ?? ""
+        bannerNote       = try c.decodeIfPresent(String.self, forKey: .bannerNote) ?? ""
+        bannerColorHex   = try c.decodeIfPresent(String.self, forKey: .bannerColorHex) ?? ""
+        isAutoMeal       = try c.decodeIfPresent(Bool.self, forKey: .isAutoMeal) ?? false
+        mealKind         = try c.decodeIfPresent(MealKind.self, forKey: .mealKind)
+        isCalendarEvent  = try c.decodeIfPresent(Bool.self, forKey: .isCalendarEvent) ?? false
+        customStartTime  = try c.decodeIfPresent(String.self, forKey: .customStartTime) ?? ""
     }
 
     /// "12A. INT. HOUSE - DAY" for display — combines the dedicated number field
@@ -185,8 +356,29 @@ struct Scene: Identifiable, Codable, Hashable {
     /// also covers scenes saved before this field existed (their number, if any,
     /// is already part of `title` from that era).
     var displayTitle: String {
+        if isBanner { return title }
         let trimmedNum = sceneNumber.trimmingCharacters(in: .whitespaces)
         return trimmedNum.isEmpty ? title : "\(trimmedNum). \(title)"
+    }
+
+    /// Auto-parses leading scene number from title if `sceneNumber` is currently empty.
+    /// E.g., title "2. EXT. PLAYA. DIA" -> sceneNumber = "2", cleanTitle = "EXT. PLAYA. DIA"
+    mutating func autoExtractSceneNumberIfNeeded() {
+        guard sceneNumber.trimmingCharacters(in: .whitespaces).isEmpty, !isBanner else { return }
+        let trimmed = title.trimmingCharacters(in: .whitespaces)
+        let pattern = #"^#?(\d+[A-Za-z]?)\.?\s*[-–—.]?\s*(.*)$"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+           let numRange = Range(match.range(at: 1), in: trimmed) {
+            let extractedNum = String(trimmed[numRange])
+            self.sceneNumber = extractedNum
+            if let restRange = Range(match.range(at: 2), in: trimmed) {
+                let rest = String(trimmed[restRange]).trimmingCharacters(in: .whitespaces)
+                if !rest.isEmpty {
+                    self.title = rest
+                }
+            }
+        }
     }
 
     /// Extracted scene number: uses dedicated sceneNumber or parses leading digits from title (e.g. "2. EXT..." -> "2")
@@ -253,31 +445,29 @@ struct Scene: Identifiable, Codable, Hashable {
 
     var stripColor: Color {
         if isNoticeStrip {
-            return .black
+            return Color(hex: "374151")
         }
         if dayNightType == .custom {
-            return Color(white: 0.75)
+            return Color(hex: "D1D5DB")
         }
-        let base: Color
         switch (intExt, dayNightType) {
-        case (.interior, .day):       base = Color(white: 0.95) // Day Interior = White/Clean Gray
-        case (.exterior, .day):       base = Color(red: 1.0, green: 0.92, blue: 0.50) // Day Exterior = Yellow
-        case (.interior, .night):     base = Color(red: 0.60, green: 0.88, blue: 0.65) // Night Interior = Green
-        case (.exterior, .night):     base = Color(red: 0.60, green: 0.80, blue: 0.98) // Night Exterior = Blue
-        case (.interior, .dawn):      base = Color(red: 0.95, green: 0.85, blue: 0.90)
-        case (.exterior, .dawn):      base = Color(red: 1.0,  green: 0.88, blue: 0.70)
-        case (.interior, .dusk):      base = Color(red: 0.85, green: 0.80, blue: 0.95)
-        case (.exterior, .dusk):      base = Color(red: 0.75, green: 0.70, blue: 0.90)
-        case (.interior, .afternoon): base = Color(red: 1.0,  green: 0.92, blue: 0.80)
-        case (.exterior, .afternoon): base = Color(red: 1.0,  green: 0.80, blue: 0.60)
-        case (.unknown, .day):        base = Color(white: 0.95)
-        case (.unknown, .night):      base = Color(red: 0.60, green: 0.80, blue: 0.98)
-        case (.unknown, .dawn):       base = Color(red: 0.95, green: 0.85, blue: 0.90)
-        case (.unknown, .dusk):       base = Color(red: 0.85, green: 0.80, blue: 0.95)
-        case (.unknown, .afternoon):  base = Color(red: 1.0,  green: 0.80, blue: 0.60)
-        case (_, .custom):            base = Color(white: 0.75)
+        case (.interior, .day):       return Color(hex: "F3F4F6") // INT. DAY (Off-white)
+        case (.exterior, .day):       return Color(hex: "FEF08A") // EXT. DAY (Yellow)
+        case (.interior, .night):     return Color(hex: "86EFAC") // INT. NIGHT (Green)
+        case (.exterior, .night):     return Color(hex: "93C5FD") // EXT. NIGHT (Blue)
+        case (.interior, .dawn):      return Color(hex: "FDE68A") // INT. DAWN (Gold)
+        case (.exterior, .dawn):      return Color(hex: "FCD34D") // EXT. DAWN (Golden Yellow)
+        case (.interior, .dusk):      return Color(hex: "E9D5FF") // INT. DUSK (Soft Lavender)
+        case (.exterior, .dusk):      return Color(hex: "C084FC") // EXT. DUSK (Twilight Purple)
+        case (.interior, .afternoon): return Color(hex: "FFE4C4") // INT. TARDE (Soft Peach)
+        case (.exterior, .afternoon): return Color(hex: "FDBA74") // EXT. TARDE (Warm Coral Sun)
+        case (.unknown, .day):        return Color(hex: "F3F4F6")
+        case (.unknown, .night):      return Color(hex: "93C5FD")
+        case (.unknown, .dawn):       return Color(hex: "FDE68A")
+        case (.unknown, .dusk):       return Color(hex: "E9D5FF")
+        case (.unknown, .afternoon):  return Color(hex: "FDBA74")
+        case (_, .custom):            return Color(hex: "D1D5DB")
         }
-        return base
     }
 
     var stripTextColor: Color {
@@ -397,7 +587,8 @@ struct CallSheetData: Codable {
     var readyToShootTime: String      // e.g. "08:00 AM"
     var lunchTime: String             // e.g. "01:30 PM"
     var snackTime: String             // Merienda, e.g. "05:00 PM"
-    var dinnerTime: String            // e.g. "09:30 PM"
+    var dinnerTime: String            // Cena, e.g. "08:30 PM"
+    var wrapTime: String              // Fin de Rodaje / Wrap, e.g. "09:30 PM"
     var quoteOfTheDay: String         // "Quote of the day"
     var prodManagerContact: String    // Producer contact override if needed
     var adContact: String             // AD contact
@@ -424,6 +615,7 @@ struct CallSheetData: Codable {
         lunchTime: String           = "",
         snackTime: String           = "",
         dinnerTime: String          = "",
+        wrapTime: String            = "",
         quoteOfTheDay: String       = "",
         prodManagerContact: String  = "",
         adContact: String           = "",
@@ -449,6 +641,7 @@ struct CallSheetData: Codable {
         self.lunchTime          = lunchTime
         self.snackTime          = snackTime
         self.dinnerTime         = dinnerTime
+        self.wrapTime           = wrapTime
         self.quoteOfTheDay      = quoteOfTheDay
         self.prodManagerContact = prodManagerContact
         self.adContact          = adContact
@@ -470,7 +663,7 @@ struct CallSheetData: Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case generalCallTime, workDaySchedule, readyToShootTime, lunchTime, snackTime, dinnerTime
+        case generalCallTime, workDaySchedule, readyToShootTime, lunchTime, snackTime, dinnerTime, wrapTime
         case quoteOfTheDay, prodManagerContact, adContact, weatherTemp, weatherCondition, weatherPrecipWind, sunTimes, basecampLocation, nearestHospital
         case castCallEntries, crewCallEntries, productionNotes, locations, castOverride, crewOverride, crewIDOverride, crewOneOffs, notes
     }
@@ -483,6 +676,7 @@ struct CallSheetData: Codable {
         lunchTime          = try c.decodeIfPresent(String.self, forKey: .lunchTime) ?? ""
         snackTime          = try c.decodeIfPresent(String.self, forKey: .snackTime) ?? ""
         dinnerTime         = try c.decodeIfPresent(String.self, forKey: .dinnerTime) ?? ""
+        wrapTime           = try c.decodeIfPresent(String.self, forKey: .wrapTime) ?? ""
         quoteOfTheDay      = try c.decodeIfPresent(String.self, forKey: .quoteOfTheDay) ?? ""
         prodManagerContact = try c.decodeIfPresent(String.self, forKey: .prodManagerContact) ?? ""
         adContact          = try c.decodeIfPresent(String.self, forKey: .adContact) ?? ""

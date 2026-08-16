@@ -651,7 +651,9 @@ struct ContentView: View {
     @State private var sortedScenes: [(index: Int, scene: Scene)] = []
 
     private func recomputeSortedScenes() {
-        let indexed = allScenes.enumerated().map { (index: $0.offset, scene: $0.element) }
+        let indexed = allScenes.enumerated()
+            .filter { !$0.element.isBanner }
+            .map { (index: $0.offset, scene: $0.element) }
         switch boneyardSort {
         case .showOrder:
             sortedScenes = indexed.sorted {
@@ -896,6 +898,9 @@ struct ContentView: View {
                     onSceneChanged: { markDirty(); pruneSelection(); recomputeConflicts(); recomputeScheduleLockChanges() },
                     onCallSheetExport: { day in
                         showCallSheetPDFSavePanel(for: day)
+                    },
+                    onShootingScheduleExport: { days in
+                        showShootingSchedulePDFSavePanel(for: days)
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -921,8 +926,9 @@ struct ContentView: View {
                 statBadge(icon: "calendar", value: "\(scheduledDays.count)", label: "days",   color: .blue)
                 statBadge(icon: "film",     value: "\(totalScenes)",          label: "scenes", color: .green)
                 statBadge(icon: "clock",    value: totalEstTime,              label: nil,      color: .purple)
-                if !allScenes.isEmpty {
-                    statBadge(icon: "tray.full", value: "\(allScenes.count)", label: "unscheduled", color: .orange)
+                let unscheduledCount = allScenes.filter { !$0.isBanner }.count
+                if unscheduledCount > 0 {
+                    statBadge(icon: "tray.full", value: "\(unscheduledCount)", label: "unscheduled", color: .orange)
                 }
             }
 
@@ -961,6 +967,30 @@ struct ContentView: View {
                 .fill(currentTheme.panelBackground(isDarkMode: isDarkMode))
         )
         .padding(.bottom, 6)
+    }
+
+    private func showShootingSchedulePDFSavePanel(for targetDays: [ShootDay]? = nil) {
+        let daysToExport = targetDays ?? shootDays
+        let pdfData = ShootingSchedulePDFExporter.generatePDF(
+            shootDays: daysToExport,
+            projectTitle: projectTitle,
+            productionInfo: productionInfo
+        )
+        let panel = NSSavePanel()
+        panel.title = L("Export Plan de Rodaje (PDF)")
+        let sanitizeName = projectTitle.isEmpty ? "Plan_de_Rodaje" : projectTitle.replacingOccurrences(of: " ", with: "_")
+        panel.nameFieldStringValue = "\(sanitizeName)_Plan_de_Rodaje.pdf"
+        panel.allowedContentTypes = [.pdf]
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                do {
+                    try pdfData.write(to: url)
+                } catch {
+                    alertMessage = "Error saving Shooting Schedule PDF: \(error.localizedDescription)"
+                    showingAlert = true
+                }
+            }
+        }
     }
 
     // MARK: - Schedule search

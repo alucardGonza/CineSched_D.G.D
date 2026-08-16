@@ -35,6 +35,7 @@ struct CallSheetEditor: View {
     @State private var lunchTime:        String = ""
     @State private var snackTime:        String = ""
     @State private var dinnerTime:       String = ""
+    @State private var wrapTime:         String = ""
     @State private var nearestHospital:  String = ""
 
     // Weather
@@ -195,8 +196,14 @@ struct CallSheetEditor: View {
                 GridRow {
                     Text(L("Snack:")).font(.subheadline).foregroundColor(.secondary)
                     TextField("e.g. 05:00 PM", text: $snackTime).textFieldStyle(RoundedBorderTextFieldStyle())
-                    Text(L("Wrap:")).font(.subheadline).foregroundColor(.secondary)
-                    TextField("e.g. 09:30 PM", text: $dinnerTime).textFieldStyle(RoundedBorderTextFieldStyle())
+                    Text(L("Dinner:")).font(.subheadline).foregroundColor(.secondary)
+                    TextField("e.g. 08:30 PM", text: $dinnerTime).textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                GridRow {
+                    Text(L("Wrap / Fin de Rodaje:")).font(.subheadline).foregroundColor(.secondary)
+                    TextField("e.g. 09:30 PM", text: $wrapTime).textFieldStyle(RoundedBorderTextFieldStyle())
+                    Spacer()
+                    Spacer()
                 }
             }
 
@@ -649,6 +656,7 @@ struct CallSheetEditor: View {
         lunchTime          = shootDay.callSheet.lunchTime.isEmpty ? productionInfo.defaultLunchTime : shootDay.callSheet.lunchTime
         snackTime          = shootDay.callSheet.snackTime
         dinnerTime         = shootDay.callSheet.dinnerTime
+        wrapTime           = shootDay.callSheet.wrapTime
         nearestHospital    = shootDay.callSheet.nearestHospital
         basecampLocation   = shootDay.callSheet.basecampLocation
 
@@ -725,6 +733,7 @@ struct CallSheetEditor: View {
         shootDay.callSheet.lunchTime          = lunchTime
         shootDay.callSheet.snackTime          = snackTime
         shootDay.callSheet.dinnerTime         = dinnerTime
+        shootDay.callSheet.wrapTime           = wrapTime
         shootDay.callSheet.basecampLocation   = basecampLocation
         shootDay.callSheet.nearestHospital    = nearestHospital
         shootDay.callSheet.weatherTemp        = weatherTemp

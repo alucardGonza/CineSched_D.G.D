@@ -26,6 +26,7 @@ struct StripboardView: View {
     @Binding var scrollToDate: Date?
     let onSceneChanged: () -> Void
     let onCallSheetExport: (ShootDay) -> Void
+    let onShootingScheduleExport: ([ShootDay]) -> Void
 
     // Editing state — mirrors CompactMonthCalendarView's
     @State private var editingDayId:      UUID?
@@ -33,6 +34,7 @@ struct StripboardView: View {
     @State private var editingSceneIndex: Int?
     @State private var showingEditSheet = false
     @State private var callSheetDay: ShootDay? = nil
+    @State private var addingBannerForDayId: UUID? = nil
 
     // Scene drag/drop state — own copy, independent of the calendar's
     @State private var dropTargetDayId:    UUID?
@@ -40,8 +42,12 @@ struct StripboardView: View {
     @State private var interactingSceneId: UUID?
 
     // Day rearrange drag/drop state
-    @State private var draggingDayId:   UUID?
-    @State private var dayDropTargetId: UUID?
+    @State private var draggingDayId:   UUID? = nil
+    @State private var dayDropTargetId: UUID? = nil
+
+    // Quick Time Edit state
+    @State private var quickEditingScene: Scene? = nil
+    @State private var quickEditingDayId: UUID? = nil
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -50,6 +56,9 @@ struct StripboardView: View {
                     ForEach(Array(shootDays.enumerated()), id: \.element.id) { dayIndex, day in
                         daySection(day: day, dayIndex: dayIndex)
                             .id(day.id)
+                            .onAppear {
+                                syncMealStrips(for: dayIndex)
+                            }
                     }
                 }
                 .padding(10)
@@ -66,8 +75,85 @@ struct StripboardView: View {
         .tooltipContainer()
         .sheet(isPresented: $showingEditSheet) { editSheetContent() }
         .sheet(item: $callSheetDay) { day in callSheetEditorContent(for: day) }
+        .sheet(item: $quickEditingScene) { scn in
+            QuickTimeEditSheet(
+                scene: scn,
+                onSave: { updated in
+                    if let dId = quickEditingDayId,
+                       let dayIdx = shootDays.firstIndex(where: { $0.id == dId }),
+                       let sceneIdx = shootDays[dayIdx].scenes.firstIndex(where: { $0.id == updated.id }) {
+                        shootDays[dayIdx].scenes[sceneIdx] = updated
+                        if (updated.isAutoMeal && updated.mealKind == .lunch) || updated.title.lowercased().contains("almuerzo") || updated.title.lowercased().contains("lunch") {
+                            if !updated.customStartTime.isEmpty {
+                                shootDays[dayIdx].callSheet.lunchTime = updated.customStartTime
+                            }
+                        }
+                        onSceneChanged()
+                    }
+                    quickEditingScene = nil
+                    quickEditingDayId = nil
+                },
+                onCancel: {
+                    quickEditingScene = nil
+                    quickEditingDayId = nil
+                }
+            )
+        }
+        .sheet(isPresented: Binding(
+            get: { addingBannerForDayId != nil },
+            set: { if !$0 { addingBannerForDayId = nil } }
+        )) {
+            BannerInputSheet(isPresented: Binding(
+                get: { addingBannerForDayId != nil },
+                set: { if !$0 { addingBannerForDayId = nil } }
+            ), onSave: { newBanner in
+                if let targetId = addingBannerForDayId,
+                   let idx = shootDays.firstIndex(where: { $0.id == targetId }) {
+                    shootDays[idx].scenes.append(newBanner)
+                    onSceneChanged()
+                }
+            })
+        }
         .onChange(of: showingEditSheet) { isShowing in
             if !isShowing { clearEditingState() }
+        }
+    }
+
+    private func syncMealStrips(for dayIndex: Int) {
+        guard dayIndex < shootDays.count else { return }
+        let day = shootDays[dayIndex]
+        let cs = day.callSheet
+
+        let mealsToEnsure: [(kind: MealKind, time: String)] = [
+            (.lunch, cs.lunchTime),
+            (.snack, cs.snackTime),
+            (.dinner, cs.dinnerTime),
+            (.wrap, cs.wrapTime)
+        ]
+
+        var updatedScenes = shootDays[dayIndex].scenes
+
+        for meal in mealsToEnsure {
+            let timeClean = meal.time.trimmingCharacters(in: .whitespaces)
+            let existingIdx = updatedScenes.firstIndex(where: { $0.isAutoMeal && $0.mealKind == meal.kind })
+
+            if !timeClean.isEmpty {
+                if let idx = existingIdx {
+                    let title = "\(meal.kind.icon) \(meal.kind.defaultTitle) (\(timeClean))"
+                    updatedScenes[idx].title = title
+                    updatedScenes[idx].bannerTitle = title
+                    updatedScenes[idx].summary = timeClean
+                } else {
+                    let newMealStrip = Scene.createAutoMeal(kind: meal.kind, timeString: timeClean)
+                    updatedScenes.append(newMealStrip)
+                }
+            } else if let idx = existingIdx {
+                updatedScenes.remove(at: idx)
+            }
+        }
+
+        if updatedScenes != shootDays[dayIndex].scenes {
+            shootDays[dayIndex].scenes = updatedScenes
         }
     }
 
@@ -75,25 +161,67 @@ struct StripboardView: View {
 
     private var dayNumbers: [UUID: Int] { productionDayNumbers(for: shootDays) }
 
-    @ViewBuilder
-    private func daySection(day: ShootDay, dayIndex: Int) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            dayHeader(day: day)
-            Divider().opacity(0.6)
+    // MARK: - Day timeline calculation
 
-            VStack(spacing: 1) {
-                ForEach(Array(day.scenes.enumerated()), id: \.element.id) { sceneIndex, scene in
-                    VStack(spacing: 0) {
-                        if shouldShowDropIndicator(dayId: day.id, position: sceneIndex) {
-                            DropIndicatorView()
-                        }
+    private func computeDayTimeline(day: ShootDay, scenes: [Scene]) -> [UUID: (timeDisplay: String, startStr: String, endStr: String, durStr: String)] {
+        var startMin = parseTimeToMinutes(day.callSheet.readyToShootTime.isEmpty ? (day.callSheet.generalCallTime.isEmpty ? "07:30 AM" : day.callSheet.generalCallTime) : day.callSheet.readyToShootTime) ?? (7 * 60 + 30)
+
+        var map: [UUID: (timeDisplay: String, startStr: String, endStr: String, durStr: String)] = [:]
+        for s in scenes {
+            if !s.customStartTime.isEmpty, let customMin = parseTimeToMinutes(s.customStartTime) {
+                startMin = customMin
+            }
+            let dur = s.estimatedTime > 0 ? s.estimatedTime : (s.isBanner ? 30 : 15)
+            let endMin = startMin + dur
+
+            let startClock = formatMinutesToClock(startMin)
+            let endClock = formatMinutesToClock(endMin)
+            let durClock = formattedTimeHM(dur)
+            let fullRange = "\(startClock) – \(endClock)"
+
+            map[s.id] = (timeDisplay: fullRange, startStr: startClock, endStr: endClock, durStr: durClock)
+            startMin = endMin
+        }
+        return map
+    }
+
+    @ViewBuilder
+    private func daySceneList(day: ShootDay, dayIndex: Int) -> some View {
+        let visibleScenes = day.scenes.filter { !$0.isCalendarEvent }
+        let timeline = computeDayTimeline(day: day, scenes: visibleScenes)
+
+        VStack(spacing: 1) {
+            ForEach(Array(visibleScenes.enumerated()), id: \.element.id) { sceneIndex, scene in
+                VStack(spacing: 0) {
+                    if shouldShowDropIndicator(dayId: day.id, position: sceneIndex) {
+                        DropIndicatorView()
+                    }
+                    if scene.isBanner {
+                        BannerStripRow(
+                            scene: scene,
+                            timeDisplay: timeline[scene.id]?.timeDisplay ?? (scene.customStartTime.isEmpty ? "" : scene.customStartTime),
+                            interactingSceneId: $interactingSceneId,
+                            isSelected: selectedSceneIDs.contains(scene.id),
+                            onQuickTimeEdit: {
+                                quickEditingScene = scene
+                                quickEditingDayId = day.id
+                            },
+                            onRemove: { removeFromDay(scene, dayId: day.id) },
+                            onDragStart: { interactingSceneId = scene.id }
+                        )
+                    } else {
                         SceneStripRow(
                             scene: scene,
+                            timeDisplay: timeline[scene.id]?.timeDisplay ?? (scene.customStartTime.isEmpty ? "" : scene.customStartTime),
                             interactingSceneId: $interactingSceneId,
                             isSelected: selectedSceneIDs.contains(scene.id),
                             selectionCount: selectedSceneIDs.count,
                             hasConflict: conflictSceneIDs.contains(scene.id),
                             hasDuplicateSceneNumber: duplicateSceneNumberIDs.contains(scene.id),
+                            onQuickTimeEdit: {
+                                quickEditingScene = scene
+                                quickEditingDayId = day.id
+                            },
                             onEdit:      { editScene(dayIndex: dayIndex, sceneIndex: sceneIndex, dayId: day.id) },
                             onRemove:    { removeFromDay(scene, dayId: day.id) },
                             onDuplicate: { duplicateScene(scene) },
@@ -102,56 +230,60 @@ struct StripboardView: View {
                             onSelect:    { selectScene(scene, dayId: day.id) }
                         )
                     }
-                    .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
-                        dayId: day.id,
-                        position: sceneIndex,
-                        dropTargetDayId: $dropTargetDayId,
-                        dropTargetPosition: $dropTargetPosition,
-                        onDrop: { sceneId in handleSceneDrop(sceneId: sceneId, targetDayId: day.id, targetPosition: sceneIndex) }
-                    ))
                 }
+                .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
+                    dayId: day.id,
+                    position: sceneIndex,
+                    dropTargetDayId: $dropTargetDayId,
+                    dropTargetPosition: $dropTargetPosition,
+                    onDrop: { sceneId in handleSceneDrop(sceneId: sceneId.uuidString, targetDayId: day.id, targetPosition: sceneIndex) }
+                ))
+            }
 
-                // Always-present drop target for "insert at the end of this day" —
-                // without its own hit-testable area, the only thing below the last
-                // strip is the whole-day fallback delegate, which in a dense list
-                // (no big empty buffer like the calendar's fixed-height cells have)
-                // leaves almost no space to actually drop onto. Production days skip
-                // this entirely — the EndOfDayStrip below takes over that job, so
-                // there's no separate gap revealing the card's background underneath.
-                if day.scenes.isEmpty {
-                    VStack(spacing: 0) {
-                        if shouldShowDropIndicator(dayId: day.id, position: day.scenes.count) {
-                            DropIndicatorView()
-                        }
-                        Color.clear.frame(height: 14)
+            if visibleScenes.isEmpty {
+                VStack(spacing: 0) {
+                    if shouldShowDropIndicator(dayId: day.id, position: 0) {
+                        DropIndicatorView()
                     }
-                    .contentShape(Rectangle())
+                    Color.clear.frame(height: 12)
+                }
+                .contentShape(Rectangle())
+                .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
+                    dayId: day.id,
+                    position: 0,
+                    dropTargetDayId: $dropTargetDayId,
+                    dropTargetPosition: $dropTargetPosition,
+                    onDrop: { sceneId in handleSceneDrop(sceneId: sceneId.uuidString, targetDayId: day.id, targetPosition: 0) }
+                ))
+            } else {
+                Color.clear
+                    .frame(height: 2)
                     .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
                         dayId: day.id,
-                        position: day.scenes.count,
+                        position: visibleScenes.count,
                         dropTargetDayId: $dropTargetDayId,
                         dropTargetPosition: $dropTargetPosition,
-                        onDrop: { sceneId in handleSceneDrop(sceneId: sceneId, targetDayId: day.id, targetPosition: day.scenes.count) }
+                        onDrop: { sceneId in handleSceneDrop(sceneId: sceneId.uuidString, targetDayId: day.id, targetPosition: visibleScenes.count) }
                     ))
-                }
             }
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, minHeight: day.scenes.isEmpty ? 36 : 0, alignment: .topLeading)
+        }
+        .padding(.horizontal, 4)
+        .background(Color.gray.opacity(colorScheme == .dark ? 0.22 : 0.12))
+    }
 
-            if !day.scenes.isEmpty {
-                let dayNum = dayNumbers[day.id] ?? (dayIndex + 1)
-                if shouldShowDropIndicator(dayId: day.id, position: day.scenes.count) {
-                    DropIndicatorView()
-                }
-                EndOfDayStrip(day: day, dayNumber: dayNum)
-                    .onDrop(of: [UTType.text.identifier], delegate: SceneDropDelegate(
-                        dayId: day.id,
-                        position: day.scenes.count,
-                        dropTargetDayId: $dropTargetDayId,
-                        dropTargetPosition: $dropTargetPosition,
-                        onDrop: { sceneId in handleSceneDrop(sceneId: sceneId, targetDayId: day.id, targetPosition: day.scenes.count) }
-                    ))
-            }
+    @ViewBuilder
+    private func daySection(day: ShootDay, dayIndex: Int) -> some View {
+        let visibleScenes = day.scenes.filter { !$0.isCalendarEvent }
+        let isSelectedTarget = dayDropTargetId == day.id || dropTargetDayId == day.id
+        VStack(alignment: .leading, spacing: 0) {
+            dayHeader(day: day)
+                .background(Color.gray.opacity(colorScheme == .dark ? 0.22 : 0.12))
+
+            Divider().opacity(0.4)
+
+            daySceneList(day: day, dayIndex: dayIndex)
+
+            EndOfDayStrip(day: day, dayNumber: dayNumbers[day.id] ?? (dayIndex + 1))
         }
         .background(
             ZStack {
@@ -161,24 +293,24 @@ struct StripboardView: View {
                 }
             }
         )
+        .cornerRadius(10)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(
                     dayDropTargetId == day.id ? Color.green :
-                    dropTargetDayId == day.id ? Color.red : Color.black,
-                    lineWidth: (dayDropTargetId == day.id || dropTargetDayId == day.id) ? 2 : 1
+                    dropTargetDayId == day.id ? Color.red : Color.primary.opacity(0.2),
+                    lineWidth: isSelectedTarget ? 2.5 : 1
                 )
         )
-        .cornerRadius(8)
         .onDrop(of: [UTType.text.identifier], delegate: CombinedDayDropDelegate(
             dayId: day.id,
-            scenes: day.scenes,
+            scenes: visibleScenes,
             dropTargetDayId: $dropTargetDayId,
             dropTargetPosition: $dropTargetPosition,
             dayDropTargetId: $dayDropTargetId,
             draggingDayId: $draggingDayId,
             onSceneDrop: { sceneId in
-                handleSceneDrop(sceneId: sceneId, targetDayId: day.id, targetPosition: day.scenes.count)
+                handleSceneDrop(sceneId: sceneId.uuidString, targetDayId: day.id, targetPosition: visibleScenes.count)
             },
             onDayDrop: { sourceDayId in
                 handleDayRearrange(sourceDayId: sourceDayId, targetDayId: day.id)
@@ -186,68 +318,93 @@ struct StripboardView: View {
         ))
     }
 
-    /// Plain, print-like date header — a grip handle for whole-day drag-to-
-    /// rearrange, the date, call sheet/conflict indicators, and the day's
-    /// scene count and page total. Click opens the call sheet, same as the
-    /// calendar's date header.
+    // MARK: - Day header
+
+    @ViewBuilder
     private func dayHeader(day: ShootDay) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(draggingDayId == day.id ? .blue : .secondary)
-                .padding(4)
-                .contentShape(Rectangle())
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.secondary)
                 .onDrag {
                     draggingDayId = day.id
                     return NSItemProvider(object: "day:\(day.id.uuidString)" as NSString)
                 }
-                .simultaneousGesture(TapGesture())   // absorbs tap so the button below doesn't fire
                 .help("Drag to move this day's scenes and call sheet to another date")
 
-            Button {
-                callSheetDay = day
-            } label: {
+            HStack(spacing: 6) {
+                Text(formattedDate(day.date))
+                    .font(.headline)
+                if day.hasCallSheetData {
+                    Circle().fill(Color.blue).frame(width: 6, height: 6)
+                }
+                if conflictDates.contains(Calendar.current.startOfDay(for: day.date)) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9)).foregroundColor(.red)
+                }
+                if let dayNumber = dayNumbers[day.id] {
+                    Text("\(L("Day")) \(dayNumber)")
+                        .font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)
+                }
                 HStack(spacing: 6) {
-                    Text(formattedDate(day.date))
-                        .font(.headline)
-                    if day.hasCallSheetData {
-                        Circle().fill(Color.blue).frame(width: 6, height: 6)
-                    }
-                    if conflictDates.contains(Calendar.current.startOfDay(for: day.date)) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9)).foregroundColor(.red)
-                    }
-                    if let dayNumber = dayNumbers[day.id] {
-                        Text("\(L("Day")) \(dayNumber)")
-                            .font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        if !day.callSheet.lunchTime.isEmpty {
-                            Text("🍽️ \(day.callSheet.lunchTime)")
-                                .font(.caption).foregroundColor(.secondary)
-                        }
-                        if !day.callSheet.snackTime.isEmpty {
-                            Text("☕ \(day.callSheet.snackTime)")
-                                .font(.caption).foregroundColor(.secondary)
-                        }
-                        if !day.callSheet.dinnerTime.isEmpty {
-                            Text("🎬 \(day.callSheet.dinnerTime)")
-                                .font(.caption).foregroundColor(.secondary)
-                        }
-                    }
-                    Spacer()
-                    if !day.scenes.isEmpty {
-                        Text("\(day.scenes.count) \(L("scn")) · \(formattedEighths(day.totalDuration)) \(L("pgs"))")
+                    if !day.callSheet.lunchTime.isEmpty {
+                        Text("🍽️ \(day.callSheet.lunchTime)")
                             .font(.caption).foregroundColor(.secondary)
                     }
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 10)).foregroundColor(.secondary)
+                    if !day.callSheet.snackTime.isEmpty {
+                        Text("☕ \(day.callSheet.snackTime)")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
+                    if !day.callSheet.dinnerTime.isEmpty {
+                        Text("🍕 \(day.callSheet.dinnerTime)")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
+                    if !day.callSheet.wrapTime.isEmpty {
+                        Text("🎬 \(day.callSheet.wrapTime)")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+                if !day.scenes.isEmpty {
+                    Text("\(day.scenes.count) \(L("scn")) · \(formattedEighths(day.totalDuration)) \(L("pgs"))")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+
+                // Action Icons on Day Header: CallSheet, Add Banner, Export PDF
+                HStack(spacing: 8) {
+                    Button {
+                        callSheetDay = day
+                    } label: {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("Edit Call Sheet"))
+
+                    Button {
+                        addingBannerForDayId = day.id
+                    } label: {
+                        Image(systemName: "plus.rectangle.on.rectangle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("Add Notice / Banner Strip"))
+
+                    Button {
+                        onShootingScheduleExport([day])
+                    } label: {
+                        Image(systemName: "arrow.down.doc")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(L("Export Plan de Rodaje (PDF)"))
                 }
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .help("Click to open call sheet for this day")
     }
 
     // MARK: - Call sheet editor (mirrors CompactMonthCalendarView)
@@ -498,15 +655,15 @@ struct EndOfDayStrip: View {
     let dayNumber: Int
 
     private var backgroundColor: Color {
-        Color(white: colorScheme == .dark ? 0.28 : 0.72)
+        Color.gray.opacity(colorScheme == .dark ? 0.22 : 0.12)
     }
 
     private var textColor: Color {
-        colorScheme == .dark ? .white : Color(white: 0.18)
+        Color.primary.opacity(0.8)
     }
 
     private var wrapPart: String {
-        let wrap = day.callSheet.dinnerTime.trimmingCharacters(in: .whitespaces)
+        let wrap = day.callSheet.wrapTime.trimmingCharacters(in: .whitespaces)
         return wrap.isEmpty ? "" : " -- \(L("Wrap:")) \(wrap)"
     }
 
@@ -524,15 +681,15 @@ struct EndOfDayStrip: View {
 
 // MARK: - SceneStripRow
 
-/// A single Movie Magic-style strip: scene number, title, cast, and page
-/// count all on one dense, full-width line, color-coded by INT/EXT + Day/Night.
 struct SceneStripRow: View {
     let scene: Scene
+    let timeDisplay: String
     @Binding var interactingSceneId: UUID?
     let isSelected:     Bool
     let selectionCount: Int
     let hasConflict:    Bool
     let hasDuplicateSceneNumber: Bool
+    let onQuickTimeEdit: () -> Void
     let onEdit:      () -> Void
     let onRemove:    () -> Void
     let onDuplicate: () -> Void
@@ -545,36 +702,69 @@ struct SceneStripRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if !scene.sceneNumber.isEmpty {
-                Text(scene.sceneNumber)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(scene.stripTextColor.opacity(0.6))
+            if !timeDisplay.isEmpty {
+                Button {
+                    onQuickTimeEdit()
+                } label: {
+                    Text(timeDisplay)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(scene.stripTextColor.opacity(0.85))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.14))
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help("Clic para ajustar horario o duración / Click to edit time")
+            }
+
+            HStack(spacing: 8) {
+                if !scene.sceneNumber.isEmpty {
+                    Text(scene.sceneNumber)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(scene.stripTextColor.opacity(0.6))
+                        .lineLimit(1)
+                        .frame(minWidth: 22, alignment: .leading)
+                }
+
+                Text(scene.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(scene.stripTextColor)
                     .lineLimit(1)
-                    .frame(minWidth: 22, alignment: .leading)
+
+                if hasConflict || hasDuplicateSceneNumber {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9)).foregroundColor(.red)
+                }
+
+                if !scene.cast.isEmpty {
+                    Text(scene.cast.joined(separator: ", "))
+                        .font(.system(size: 10))
+                        .foregroundColor(scene.stripTextColor.opacity(0.6))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                if scene.estimatedTime > 0 {
+                    Text("(\(formattedTimeHM(scene.estimatedTime)))")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(scene.stripTextColor.opacity(0.75))
+                }
+
+                Text(FractionParser.formatEighths(scene.duration))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(scene.stripTextColor.opacity(0.8))
             }
-
-            Text(scene.title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(scene.stripTextColor)
-                .lineLimit(1)
-
-            if hasConflict || hasDuplicateSceneNumber {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 9)).foregroundColor(.red)
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                interactingSceneId = nil
+                onEdit()
             }
-
-            if !scene.cast.isEmpty {
-                Text(scene.cast.joined(separator: ", "))
-                    .font(.system(size: 10))
-                    .foregroundColor(scene.stripTextColor.opacity(0.6))
-                    .lineLimit(1)
+            .onTapGesture(count: 1) {
+                interactingSceneId = nil
+                onSelect()
             }
-
-            Spacer(minLength: 4)
-
-            Text(FractionParser.formatEighths(scene.duration))
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(scene.stripTextColor.opacity(0.7))
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -597,9 +787,9 @@ struct SceneStripRow: View {
             onDragStart()
             return NSItemProvider(object: scene.id.uuidString as NSString)
         }
-        .simultaneousGesture(TapGesture(count: 2).onEnded { interactingSceneId = nil; onEdit() })
-        .simultaneousGesture(TapGesture(count: 1).onEnded { interactingSceneId = nil; onSelect() })
         .contextMenu {
+            Button("Ajustar Horario / Set Time...") { interactingSceneId = nil; onQuickTimeEdit() }
+            Divider()
             Button(L("Edit Scene")) { interactingSceneId = nil; onEdit() }
             Button(isMultiSelected ? "\(L("Remove")) \(selectionCount) \(L("scenes"))" : L("Remove from Day")) {
                 interactingSceneId = nil; onRemove()
@@ -609,6 +799,231 @@ struct SceneStripRow: View {
         }
         .onChange(of: isDragging) { dragging in
             if !dragging { onDragEnd() }
+        }
+    }
+}
+
+// MARK: - BannerStripRow
+
+struct BannerStripRow: View {
+    let scene: Scene
+    let timeDisplay: String
+    @Binding var interactingSceneId: UUID?
+    let isSelected: Bool
+    let onQuickTimeEdit: () -> Void
+    let onRemove: () -> Void
+    let onDragStart: () -> Void
+
+    private var isDragging: Bool { interactingSceneId == scene.id }
+    private var bannerColor: Color {
+        if scene.bannerColorHex.isEmpty { return Color.purple }
+        return Color(hex: scene.bannerColorHex)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if !timeDisplay.isEmpty {
+                Button {
+                    onQuickTimeEdit()
+                } label: {
+                    Text(timeDisplay)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.35))
+                        .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help("Clic para ajustar horario o duración / Click to edit time")
+            }
+
+            Image(systemName: scene.bannerType?.defaultIcon ?? "flag.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white)
+
+            let cleanedTitle = scene.title.replacingOccurrences(of: #"\s*\(\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+            Text(cleanedTitle)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            if scene.estimatedTime > 0 {
+                Text(formattedTime(scene.estimatedTime))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.9))
+            }
+
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            .help("Eliminar Tira / Delete Banner")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(bannerColor)
+        .cornerRadius(4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(isSelected ? Color.accentColor : Color.black.opacity(0.2), lineWidth: isSelected ? 2 : 0.5)
+        )
+        .onDrag {
+            interactingSceneId = scene.id
+            onDragStart()
+            return NSItemProvider(object: scene.id.uuidString as NSString)
+        }
+        .contextMenu {
+            Button(L("Set Time...")) { interactingSceneId = nil; onQuickTimeEdit() }
+            Divider()
+            Button(L("Delete Banner"), role: .destructive) {
+                onRemove()
+            }
+        }
+    }
+}
+
+// MARK: - Quick Time Edit Sheet
+
+struct QuickTimeEditSheet: View {
+    let scene: Scene
+    let onSave: (Scene) -> Void
+    let onCancel: () -> Void
+
+    @State private var isCustomTime: Bool = false
+    @State private var customTimeText: String = ""
+    @State private var hours: Int = 0
+    @State private var minutes: Int = 15
+
+    private var calculatedEndTime: String {
+        let startMin = parseTimeToMinutes(customTimeText) ?? (8 * 60)
+        let totalDur = (hours * 60) + minutes
+        let endMin = startMin + totalDur
+        return "\(formatMinutesToClock(startMin)) ➔ \(formatMinutesToClock(endMin)) (\(formattedTimeHM(totalDur)))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label(L("Set Shooting Time"), systemImage: "clock.badge.checkmark")
+                    .font(.headline)
+                Spacer()
+                Button { onCancel() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("STRIP / SCENE:"))
+                    .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+                Text(scene.displayTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(2)
+            }
+
+            Divider()
+
+            // Mode Selector
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L("TIME MODE:"))
+                    .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+
+                Picker("", selection: $isCustomTime) {
+                    Text(L("Automatic Cascade (by order)")).tag(false)
+                    Text(L("Fixed Time (e.g. 11:00 AM)")).tag(true)
+                }
+                .pickerStyle(.radioGroup)
+
+                if isCustomTime {
+                    HStack {
+                        Text(L("Start Time:"))
+                            .font(.caption).fontWeight(.semibold)
+                        TextField("11:00 AM", text: $customTimeText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 160)
+                    }
+                    .padding(.top, 2)
+                }
+            }
+
+            Divider()
+
+            // Duration Selector
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L("ESTIMATED DURATION:"))
+                    .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Stepper("\(hours) h", value: $hours, in: 0...12)
+                    }
+                    HStack(spacing: 4) {
+                        Stepper("\(minutes) min", value: $minutes, in: 0...59, step: 5)
+                    }
+                }
+            }
+
+            // Live Preview Banner
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("SCHEDULE PREVIEW:"))
+                    .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+
+                HStack {
+                    Image(systemName: "timer")
+                        .foregroundColor(.accentColor)
+                    if isCustomTime && !customTimeText.isEmpty {
+                        Text(calculatedEndTime)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    } else {
+                        let dur = (hours * 60) + minutes
+                        let autoMsg = LocalizationManager.shared.currentLanguage == .spanish ? "Duración: \(formattedTimeHM(dur)) (se calcula según el orden del día)" : "Duration: \(formattedTimeHM(dur)) (cascades by day order)"
+                        Text(autoMsg)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(6)
+            }
+
+            Divider()
+
+            HStack {
+                Button(L("Cancel")) { onCancel() }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button(L("Save Schedule")) {
+                    var updated = scene
+                    if isCustomTime {
+                        updated.customStartTime = customTimeText.trimmingCharacters(in: .whitespaces)
+                    } else {
+                        updated.customStartTime = ""
+                    }
+                    updated.estimatedTime = (hours * 60) + minutes
+                    onSave(updated)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(18)
+        .frame(width: 360)
+        .onAppear {
+            let start = scene.customStartTime.trimmingCharacters(in: .whitespaces)
+            isCustomTime = !start.isEmpty
+            customTimeText = start.isEmpty ? "08:00 AM" : start
+            let dur = scene.estimatedTime > 0 ? scene.estimatedTime : (scene.isBanner ? 30 : 15)
+            hours = dur / 60
+            minutes = dur % 60
         }
     }
 }

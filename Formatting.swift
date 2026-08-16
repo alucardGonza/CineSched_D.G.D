@@ -88,3 +88,35 @@ func generateDays(from startDate: Date, to endDate: Date) -> [ShootDay] {
     }
     return days
 }
+
+/// Parses "11:00 AM", "01:30 PM", or "11:00" into total minutes from midnight
+func parseTimeToMinutes(_ raw: String) -> Int? {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces).uppercased()
+    guard !trimmed.isEmpty else { return nil }
+
+    let isPM = trimmed.contains("PM")
+    let isAM = trimmed.contains("AM")
+
+    let clean = trimmed.replacingOccurrences(of: "AM", with: "").replacingOccurrences(of: "PM", with: "").trimmingCharacters(in: .whitespaces)
+    let parts = clean.components(separatedBy: ":")
+    if parts.count == 2, var h = Int(parts[0]), let m = Int(parts[1]) {
+        if isPM && h < 12 { h += 12 }
+        if isAM && h == 12 { h = 0 }
+        return h * 60 + m
+    }
+    if let h = Int(clean) {
+        return h * 60
+    }
+    return nil
+}
+
+/// Formats total minutes from midnight into 12-hour or 24-hour clock string (e.g. 690 -> "11:30 AM")
+func formatMinutesToClock(_ minutes: Int) -> String {
+    let totalMinutes = (minutes % 1440 + 1440) % 1440
+    let h24 = totalMinutes / 60
+    let m = totalMinutes % 60
+    let isPM = h24 >= 12
+    let h12 = h24 == 0 ? 12 : (h24 > 12 ? h24 - 12 : h24)
+    let ampm = isPM ? "PM" : "AM"
+    return String(format: "%02d:%02d %@", h12, m, ampm)
+}
