@@ -98,8 +98,6 @@ struct ProductionSetupSheet: View {
                                     .frame(maxWidth: 180)
                             }
                         }
-
-                        LabeledField(L("Default Lunch Time"), placeholder: "e.g. 01:30 PM", text: $defaultLunchTime)
                     }
 
                     Divider()
