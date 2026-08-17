@@ -53,7 +53,7 @@ Core lee y escribe `Stream`. App decide cómo obtenerlo mediante servicios concr
 
 ### ADR-006: PDFsharp Core y fuentes embebidas
 
-Los reportes se generan con PDFsharp Core 6.2.4. Noto Sans Regular, Bold e Italic se incluyen como assets con su licencia OFL y un font resolver. El PDF no depende de AppKit, PDFKit, GDI ni fuentes instaladas.
+Los reportes se generan con PDFsharp Core 6.2.4. Roboto Regular, Bold e Italic se incluyen como recursos desde `FontLibrary.libRoboto`, con licencia Apache 2.0 para la tipografía y un font resolver propio. El PDF no depende de AppKit, PDFKit, GDI ni fuentes instaladas.
 
 ## 4. Diagrama de dependencias
 

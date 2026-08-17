@@ -57,7 +57,7 @@ Si una implementación contradice `SPEC.md`, la implementación es incorrecta. S
 | Runtime y SDK | .NET SDK 10.0.400, fijado en `global.json` |
 | UI | Uno SDK 6.6.42, XAML compatible con WinUI y Skia Desktop |
 | Patrón de presentación | MVVM con CommunityToolkit.Mvvm 8.4.2 |
-| PDF | PDFsharp Core 6.2.4 con fuentes Noto Sans embebidas |
+| PDF | PDFsharp Core 6.2.4 con fuentes Roboto embebidas |
 | JSON | `System.Text.Json` con convertidores propios de compatibilidad Swift |
 | XML/FDX | `System.Xml`/`System.Xml.Linq`, sin dependencia de Final Draft |
 | Highland | `System.IO.Compression.ZipArchive` |
@@ -196,7 +196,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 
 **Trabajo**
 
-- Crear un font resolver con Noto Sans Regular, Bold e Italic y registrar sus licencias.
+- Crear un font resolver con Roboto Regular, Bold e Italic y registrar sus licencias.
 - Portar calendario, strip schedule, One-Line Shooting Schedule, DOOD, breakdown y call sheet.
 - Conservar orientación US Letter, márgenes, paginación, códigos y localización.
 - Separar cálculo/layout de la escritura PDF para permitir pruebas deterministas.
@@ -261,7 +261,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 |---|---|
 | Fechas Swift usan formatter y fallback numérico propio | `DateTimeOffset`, convertidor dual y fixtures de diferentes zonas horarias |
 | Diferencias de controles o drag-and-drop entre targets Uno | Reglas en Core, payload por UUID y checklist por plataforma |
-| PDF cambia por fuentes del host | Noto Sans embebida y font resolver único |
+| PDF cambia por fuentes del host | Roboto embebida y font resolver único |
 | Highland no es un ZIP válido o cambia su estructura | Validación defensiva y búsqueda limitada a entradas conocidas |
 | Paths recientes pierden permisos | Adaptadores de plataforma, descarte de entradas stale y error recuperable |
 | Proyecto grande degrada calendario | Colecciones virtualizadas, recomputación incremental y pruebas de rendimiento |

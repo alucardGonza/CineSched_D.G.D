@@ -1,0 +1,11 @@
+global using System.Collections.ObjectModel;
+global using CineSched.Core.Common;
+global using CineSched.Core.Features.Projects;
+global using CineSched.Core.Features.Scheduling;
+global using CommunityToolkit.Mvvm.ComponentModel;
+global using CommunityToolkit.Mvvm.Input;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.UI.Xaml;
+global using Microsoft.UI.Xaml.Controls;
+global using Windows.Storage;
