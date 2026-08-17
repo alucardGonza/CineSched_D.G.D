@@ -1,0 +1,338 @@
+<Page
+    x:Class="CineSched.App.Shell.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:CineSched.App.Converters"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <Page.Resources>
+    <converters:ShortDateConverter x:Key="ShortDateConverter" />
+    <converters:LocalizedEnumConverter x:Key="LocalizedEnumConverter" />
+  </Page.Resources>
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0">
+      <MenuBar>
+        <MenuBarItem Title="{Binding FileMenuLabel}" AutomationProperties.AutomationId="Menu.File">
+          <MenuFlyoutItem Text="{Binding NewLabel}" Command="{Binding NewProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" />
+          <MenuFlyoutSeparator />
+          <MenuFlyoutItem Text="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
+          <MenuFlyoutItem Text="{Binding ExportLabel}" Command="{Binding ExportReportCommand}" />
+        </MenuBarItem>
+        <MenuBarItem Title="{Binding EditMenuLabel}" AutomationProperties.AutomationId="Menu.Edit">
+          <MenuFlyoutItem Text="{Binding UndoLabel}" Command="{Binding UndoCommand}" />
+          <MenuFlyoutItem Text="{Binding RedoLabel}" Command="{Binding RedoCommand}" />
+        </MenuBarItem>
+        <MenuBarItem Title="{Binding ProductionLabel}" AutomationProperties.AutomationId="Menu.Production">
+          <MenuFlyoutItem Text="{Binding BreakdownBrowserLabel}" Click="BreakdownBrowser_Click" />
+          <MenuFlyoutItem Text="{Binding LockScheduleLabel}" Command="{Binding LockScheduleCommand}" />
+          <MenuFlyoutItem Text="{Binding UnlockScheduleLabel}" Command="{Binding UnlockScheduleCommand}" />
+        </MenuBarItem>
+      </MenuBar>
+      <CommandBar DefaultLabelPosition="Right">
+        <AppBarButton Icon="Add" Label="{Binding NewLabel}" Command="{Binding NewProjectCommand}" AutomationProperties.AutomationId="Project.New" />
+        <AppBarButton Icon="OpenFile" Label="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" AutomationProperties.AutomationId="Project.Open" />
+        <AppBarButton Icon="Save" Label="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" AutomationProperties.AutomationId="Project.Save" />
+        <AppBarButton Icon="SaveLocal" Label="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" AutomationProperties.AutomationId="Project.SaveAs" />
+        <AppBarSeparator />
+        <AppBarButton Icon="Document" Label="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
+        <AppBarButton Icon="Undo" Label="{Binding UndoLabel}" Command="{Binding UndoCommand}" AutomationProperties.AutomationId="Project.Undo" />
+        <AppBarButton Icon="Redo" Label="{Binding RedoLabel}" Command="{Binding RedoCommand}" AutomationProperties.AutomationId="Project.Redo" />
+      </CommandBar>
+    </StackPanel>
+
+    <NavigationView x:Name="Navigation" Grid.Row="1" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
+                    PaneDisplayMode="LeftCompact" IsPaneOpen="{Binding IsSidebarOpen, Mode=TwoWay}"
+                    PaneOpening="Navigation_PaneOpening" PaneClosing="Navigation_PaneClosing"
+                    SelectionChanged="Navigation_SelectionChanged">
+      <NavigationView.MenuItems>
+        <NavigationViewItem Content="{Binding CalendarLabel}" Icon="Calendar" Tag="calendar" AutomationProperties.AutomationId="Nav.Calendar" />
+        <NavigationViewItem Content="{Binding StripboardLabel}" Icon="List" Tag="stripboard" AutomationProperties.AutomationId="Nav.Stripboard" />
+        <NavigationViewItem Content="{Binding ProductionLabel}" Icon="Contact" Tag="production" AutomationProperties.AutomationId="Nav.Production" />
+        <NavigationViewItem Content="{Binding ReportsLabel}" Icon="Document" Tag="reports" AutomationProperties.AutomationId="Nav.Reports" />
+        <NavigationViewItem Content="{Binding SettingsLabel}" Icon="Setting" Tag="settings" AutomationProperties.AutomationId="Nav.Settings" />
+      </NavigationView.MenuItems>
+      <NavigationView.PaneFooter>
+        <StackPanel x:Name="RecentFilesPanel" Spacing="4" Margin="4,8" Visibility="Collapsed">
+          <TextBlock Text="{Binding RecentProjectsLabel}" FontWeight="SemiBold" />
+          <ListView ItemsSource="{Binding RecentFiles}" IsItemClickEnabled="True"
+                    ItemClick="RecentFiles_ItemClick" MaxHeight="180"
+                    SelectionMode="None">
+            <ListView.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" MaxWidth="220" TextTrimming="CharacterEllipsis"
+                           ToolTipService.ToolTip="{Binding}" />
+              </DataTemplate>
+            </ListView.ItemTemplate>
+          </ListView>
+        </StackPanel>
+      </NavigationView.PaneFooter>
+
+      <Grid Padding="20">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBox Grid.Row="0" Text="{Binding ProjectTitle, Mode=TwoWay}" FontSize="24" AutomationProperties.AutomationId="Project.Title"
+                 FontWeight="SemiBold" BorderThickness="0" Margin="0,0,0,12" />
+
+        <Grid x:Name="Workspace" Grid.Row="1">
+          <Grid x:Name="CalendarWorkspace" AutomationProperties.AutomationId="Workspace.Calendar">
+            <Grid ColumnSpacing="16">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Padding="12" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding BoneyardLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="{Binding AddSceneLabel}" Click="AddScene_Click" AutomationProperties.AutomationId="Scene.Add" />
+                      <Button Content="{Binding BreakdownLabel}" Click="BreakdownBrowser_Click" AutomationProperties.AutomationId="Scene.Breakdown" />
+                      <Button Content="{Binding CopyLabel}" Command="{Binding CopySceneCommand}" AutomationProperties.AutomationId="Scene.Copy" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Grid.Row="1" Spacing="4" Margin="0,8">
+                    <TextBox PlaceholderText="{Binding SearchPlaceholder}"
+                             Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox Header="{Binding SortLabel}" ItemsSource="{Binding BoneyardSorts}"
+                              SelectedItem="{Binding SelectedBoneyardSort, Mode=TwoWay}">
+                      <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource LocalizedEnumConverter}}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </StackPanel>
+                  <ListView Grid.Row="2" ItemsSource="{Binding Boneyard}" SelectionMode="Extended"
+                            CanDragItems="True" DragItemsStarting="Boneyard_DragItemsStarting"
+                            SelectedItem="{Binding SelectedBoneyardScene, Mode=TwoWay}">
+                    <ListView.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Padding="4" Spacing="4" PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited"
+                                    DoubleTapped="Scene_DoubleTapped" ToolTipService.ToolTip="{Binding Summary}">
+                          <StackPanel>
+                            <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Summary}" Opacity="0.7" TextTrimming="CharacterEllipsis" MaxLines="2" />
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Content="{Binding DataContext.EditLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditScene_Click" />
+                            <Button Content="{Binding DataContext.DuplicateLabel, ElementName=Navigation}" Tag="{Binding}" Click="DuplicateScene_Click" />
+                            <Button Content="{Binding DataContext.DeleteLabel, ElementName=Navigation}" Tag="{Binding}" Click="DeleteScene_Click" />
+                          </StackPanel>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ListView.ItemTemplate>
+                  </ListView>
+                  <Button Grid.Row="3" Content="{Binding SendToDayLabel}" Command="{Binding SendToDayCommand}" HorizontalAlignment="Stretch" />
+                </Grid>
+              </Border>
+
+              <Grid Grid.Column="1">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <StackPanel Spacing="8" Margin="0,0,0,8">
+                  <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <DatePicker x:Name="RangeStart" Header="{Binding StartLabel}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Schedule.RangeStart" />
+                    <DatePicker x:Name="RangeEnd" Grid.Column="1" Header="{Binding EndLabel}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Schedule.RangeEnd" />
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <CheckBox x:Name="ShiftSchedule" Content="{Binding ShiftScheduleLabel}" AutomationProperties.AutomationId="Schedule.Shift" />
+                    <Button Content="{Binding ApplyRangeLabel}" Click="ChangeRange_Click" AutomationProperties.AutomationId="Schedule.ApplyRange" />
+                  </StackPanel>
+                </StackPanel>
+                <ListView Grid.Row="1" ItemsSource="{Binding ShootDays}" CanDragItems="True"
+                          DragItemsStarting="ShootDays_DragItemsStarting"
+                          SelectedItem="{Binding SelectedDay, Mode=TwoWay}">
+                  <ListView.ItemTemplate>
+                    <DataTemplate>
+                      <Border Padding="12" Margin="0,0,0,8" CornerRadius="8" AllowDrop="True" DragOver="Move_DragOver" Drop="CalendarDay_Drop"
+                              PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited"
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid ColumnSpacing="12">
+                          <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding Date, Converter={StaticResource ShortDateConverter}}" FontWeight="SemiBold" />
+                          <ListView Grid.Column="1" ItemsSource="{Binding Scenes}" SelectionMode="Extended" CanDragItems="True"
+                                    DragItemsStarting="DayScenes_DragItemsStarting">
+                            <ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" /><Button Grid.Column="1" Content="{Binding DataContext.RemoveLabel, ElementName=Navigation}" Tag="{Binding}" Click="RemoveFromDay_Click" /></Grid></DataTemplate></ListView.ItemTemplate>
+                          </ListView>
+                          <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding TotalDuration}" HorizontalAlignment="Right" />
+                            <TextBlock Text="{Binding DataContext.EighthsLabel, ElementName=Navigation}" Opacity="0.65" FontSize="11" />
+                            <Button Content="{Binding DataContext.BlackoutLabel, ElementName=Navigation}" Tag="{Binding}" Click="ToggleBlackout_Click" Margin="0,6,0,0" />
+                            <Button Content="{Binding DataContext.AllWeekdaysLabel, ElementName=Navigation}" Tag="{Binding}" Click="ToggleWeekdayBlackout_Click" Margin="0,4,0,0" />
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListView.ItemTemplate>
+                </ListView>
+              </Grid>
+            </Grid>
+          </Grid>
+
+          <Grid x:Name="StripboardWorkspace" Visibility="Collapsed" AutomationProperties.AutomationId="Workspace.Stripboard">
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                <TextBlock Text="{Binding SelectedStripboardLabel}" Style="{ThemeResource TitleTextBlockStyle}" />
+                <Button Content="{Binding AddBannerLabel}" Click="AddBanner_Click" />
+                <Button Content="{Binding AddMealLabel}" Click="AddMeal_Click" />
+                <Button Content="{Binding AddEventLabel}" Click="AddEvent_Click" />
+              </StackPanel>
+              <ListView Grid.Row="1" ItemsSource="{Binding SelectedDayScenes}" SelectionMode="Extended"
+                        CanDragItems="True" DragItemsStarting="Stripboard_DragItemsStarting">
+                <ListView.ItemTemplate>
+                  <DataTemplate>
+                    <Border Padding="12" Margin="0,0,0,6" CornerRadius="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            AllowDrop="True" DragOver="Move_DragOver" Drop="StripScene_Drop"
+                            PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited">
+                      <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="100" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding SceneNumber}" FontWeight="Bold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Title}" />
+                        <TextBlock Grid.Column="2" Text="{Binding EstimatedTime}" HorizontalAlignment="Right" />
+                        <Button Grid.Column="3" Content="{Binding DataContext.EditLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditScene_Click" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+            </Grid>
+          </Grid>
+
+          <Grid x:Name="ProductionWorkspace" Visibility="Collapsed" AutomationProperties.AutomationId="Workspace.Production">
+            <Pivot x:Name="ProductionPivot" AutomationProperties.AutomationId="Production.Tabs">
+              <PivotItem Header="{Binding ProductionLabel}">
+                <ScrollViewer>
+                  <StackPanel Spacing="8" MaxWidth="700" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding ProductionSetupLabel}" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBox Header="{Binding CompanyLabel}" Text="{Binding ProductionDraft.CompanyName, Mode=TwoWay}" />
+                    <TextBox Header="{Binding DirectorLabel}" Text="{Binding ProductionDraft.DirectorName, Mode=TwoWay}" />
+                    <TextBox Header="{Binding DirectorPhoneLabel}" Text="{Binding ProductionDraft.DirectorPhone, Mode=TwoWay}" />
+                    <TextBox Header="{Binding ProducerLabel}" Text="{Binding ProductionDraft.ProducerName, Mode=TwoWay}" />
+                    <TextBox Header="{Binding ProducerPhoneLabel}" Text="{Binding ProductionDraft.ProducerPhone, Mode=TwoWay}" />
+                    <TextBox Header="{Binding FirstAdLabel}" Text="{Binding ProductionDraft.AdName, Mode=TwoWay}" />
+                    <TextBox Header="{Binding AdPhoneLabel}" Text="{Binding ProductionDraft.AdPhone, Mode=TwoWay}" />
+                    <TextBox Header="{Binding ContactLabel}" Text="{Binding ProductionDraft.ContactNumber, Mode=TwoWay}" />
+                    <TextBox Header="{Binding DefaultLunchLabel}" Text="{Binding ProductionDraft.DefaultLunchTime, Mode=TwoWay}" />
+                    <Button Content="{Binding SaveProductionLabel}" Command="{Binding SaveProductionCommand}" HorizontalAlignment="Left" AutomationProperties.AutomationId="Production.Save" />
+                  </StackPanel>
+                </ScrollViewer>
+              </PivotItem>
+              <PivotItem Header="{Binding RostersLabel}">
+                <Grid ColumnSpacing="12">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding CastLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="{Binding AddLabel}" Click="AddCast_Click" AutomationProperties.AutomationId="Roster.Cast.Add" /></StackPanel>
+                    <ListView ItemsSource="{Binding CastRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Spacing="2"><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding DisplayString}" Width="180" /><Button Content="{Binding DataContext.EditLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditCast_Click" /><Button Content="{Binding DataContext.AvailabilityLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditAvailability_Click" /><Button Content="{Binding DataContext.DeleteLabel, ElementName=Navigation}" Tag="{Binding}" Click="DeleteCast_Click" /></StackPanel><TextBlock Text="{Binding UnavailableSummary}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding CrewLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="{Binding AddLabel}" Click="AddCrew_Click" AutomationProperties.AutomationId="Roster.Crew.Add" /></StackPanel>
+                    <ListView ItemsSource="{Binding CrewRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding DisplayString}" Width="180" /><Button Content="{Binding DataContext.EditLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditCrew_Click" /><Button Content="{Binding DataContext.DeleteLabel, ElementName=Navigation}" Tag="{Binding}" Click="DeleteCrew_Click" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding LocationsLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="{Binding AddLabel}" Click="AddLocation_Click" AutomationProperties.AutomationId="Roster.Location.Add" /></StackPanel>
+                    <ListView ItemsSource="{Binding LocationRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding Name}" Width="180" /><Button Content="{Binding DataContext.EditLabel, ElementName=Navigation}" Tag="{Binding}" Click="EditLocation_Click" /><Button Content="{Binding DataContext.DeleteLabel, ElementName=Navigation}" Tag="{Binding}" Click="DeleteLocation_Click" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                </Grid>
+              </PivotItem>
+              <PivotItem Header="{Binding CallSheetLabel}">
+                <ScrollViewer>
+                  <StackPanel Spacing="8" MaxWidth="700" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{Binding InitializeFromDayLabel}" Command="{Binding InitializeCallSheetCommand}" AutomationProperties.AutomationId="CallSheet.Initialize" /><Button Content="{Binding SelectCrewLabel}" Click="SelectCallSheetCrew_Click" AutomationProperties.AutomationId="CallSheet.SelectCrew" /><Button Content="{Binding SaveCallSheetLabel}" Command="{Binding SaveCallSheetCommand}" AutomationProperties.AutomationId="CallSheet.Save" /></StackPanel>
+                    <TextBox Header="{Binding GeneralCallLabel}" Text="{Binding CallSheetDraft.GeneralCallTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding WorkDayScheduleLabel}" Text="{Binding CallSheetDraft.WorkDaySchedule, Mode=TwoWay}" />
+                    <TextBox Header="{Binding ReadyToShootLabel}" Text="{Binding CallSheetDraft.ReadyToShootTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding LunchLabel}" Text="{Binding CallSheetDraft.LunchTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding SnackLabel}" Text="{Binding CallSheetDraft.SnackTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding DinnerLabel}" Text="{Binding CallSheetDraft.DinnerTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding WrapLabel}" Text="{Binding CallSheetDraft.WrapTime, Mode=TwoWay}" />
+                    <TextBox Header="{Binding QuoteOfDayLabel}" Text="{Binding CallSheetDraft.QuoteOfTheDay, Mode=TwoWay}" />
+                    <TextBox Header="{Binding ProductionManagerContactLabel}" Text="{Binding CallSheetDraft.ProdManagerContact, Mode=TwoWay}" />
+                    <TextBox Header="{Binding AdContactLabel}" Text="{Binding CallSheetDraft.AdContact, Mode=TwoWay}" />
+                    <TextBox Header="{Binding WeatherTemperatureLabel}" Text="{Binding CallSheetDraft.WeatherTemp, Mode=TwoWay}" />
+                    <TextBox Header="{Binding WeatherConditionsLabel}" Text="{Binding CallSheetDraft.WeatherCondition, Mode=TwoWay}" />
+                    <TextBox Header="{Binding PrecipitationWindLabel}" Text="{Binding CallSheetDraft.WeatherPrecipWind, Mode=TwoWay}" />
+                    <TextBox Header="{Binding SunriseSunsetLabel}" Text="{Binding CallSheetDraft.SunTimes, Mode=TwoWay}" />
+                    <TextBox Header="{Binding BasecampLabel}" Text="{Binding CallSheetDraft.BasecampLocation, Mode=TwoWay}" />
+                    <TextBox Header="{Binding NearestHospitalLabel}" Text="{Binding CallSheetDraft.NearestHospital, Mode=TwoWay}" />
+                    <TextBlock Text="{Binding CastCallsLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CallSheetDraft.CastCallEntries}">
+                      <ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="110" /><ColumnDefinition Width="100" /><ColumnDefinition Width="90" /><ColumnDefinition Width="90" /></Grid.ColumnDefinitions><TextBox Header="{Binding DataContext.CharacterLabel, ElementName=Navigation}" Text="{Binding CharacterName, Mode=TwoWay}" /><TextBox Grid.Column="1" Header="{Binding DataContext.ActorLabel, ElementName=Navigation}" Text="{Binding ActorName, Mode=TwoWay}" /><TextBox Grid.Column="2" Header="{Binding DataContext.ScenesLabel, ElementName=Navigation}" Text="{Binding SceneNumbers, Mode=TwoWay}" /><TextBox Grid.Column="3" Header="{Binding DataContext.OnSetLabel, ElementName=Navigation}" Text="{Binding OnSetTime, Mode=TwoWay}" /><TextBox Grid.Column="4" Header="{Binding DataContext.WrapLabel, ElementName=Navigation}" Text="{Binding WrapTime, Mode=TwoWay}" /></Grid></DataTemplate></ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock Text="{Binding LocationsLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CallSheetDraft.Locations}"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ListView.ItemTemplate></ListView>
+                    <TextBox Header="{Binding NotesLabel}" Text="{Binding CallSheetDraft.Notes, Mode=TwoWay}" AcceptsReturn="True" Height="100" />
+                  </StackPanel>
+                </ScrollViewer>
+              </PivotItem>
+              <PivotItem Header="{Binding ConflictsLockLabel}">
+                <Grid ColumnSpacing="16">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding ConflictsLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CurrentConflicts}"><ListView.ItemTemplate><DataTemplate><Button Content="{Binding DisplayString}" Tag="{Binding}" Click="JumpToConflict_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" /></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{Binding LockBaselineLabel}" Command="{Binding LockScheduleCommand}" AutomationProperties.AutomationId="Schedule.Lock" /><Button Content="{Binding UnlockScheduleLabel}" Command="{Binding UnlockScheduleCommand}" AutomationProperties.AutomationId="Schedule.Unlock" /></StackPanel>
+                    <TextBlock Text="{Binding ScheduleLockChangesLabel}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding ScheduleLockChanges}"><ListView.ItemTemplate><DataTemplate><Button Tag="{Binding}" Click="JumpToLockChange_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel><TextBlock Text="{Binding ActorDisplayName}" FontWeight="SemiBold" /><TextBlock Text="{Binding DisplayString}" Opacity="0.7" TextWrapping="Wrap" /></StackPanel></Button></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                </Grid>
+              </PivotItem>
+            </Pivot>
+          </Grid>
+
+          <Grid x:Name="ReportsWorkspace" Visibility="Collapsed" AutomationProperties.AutomationId="Workspace.Reports">
+            <StackPanel Spacing="16" MaxWidth="520" HorizontalAlignment="Left">
+              <TextBlock Text="{Binding ExportReportLabel}" Style="{ThemeResource TitleTextBlockStyle}" />
+              <ComboBox ItemsSource="{Binding ReportKinds}" SelectedItem="{Binding SelectedReportKind, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Report.Kind">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource LocalizedEnumConverter}}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button Content="{Binding ExportLabel}" Command="{Binding ExportReportCommand}" HorizontalAlignment="Left" AutomationProperties.AutomationId="Report.Export" />
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="SettingsWorkspace" Visibility="Collapsed" AutomationProperties.AutomationId="Workspace.Settings">
+            <StackPanel Spacing="16" MaxWidth="520" HorizontalAlignment="Left">
+              <TextBlock Text="{Binding SettingsLabel}" Style="{ThemeResource TitleTextBlockStyle}" />
+              <TextBlock Text="{Binding LanguageLabel}" />
+              <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Settings.Language">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource LocalizedEnumConverter}}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding ThemeLabel}" />
+              <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Settings.Theme">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource LocalizedEnumConverter}}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding ColorModeLabel}" />
+              <ComboBox ItemsSource="{Binding ColorModes}" SelectedItem="{Binding SelectedColorMode, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="Settings.ColorMode">
+                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource LocalizedEnumConverter}}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <CheckBox Content="{Binding SidebarLabel}" IsChecked="{Binding IsSidebarOpen, Mode=TwoWay}" AutomationProperties.AutomationId="Settings.Sidebar" />
+              <CheckBox Content="{Binding HoldDaysLabel}" IsChecked="{Binding IncludeHoldDays, Mode=TwoWay}" AutomationProperties.AutomationId="Settings.HoldDays" />
+              <Border Height="8" CornerRadius="4" Background="{Binding AccentBrush}" />
+            </StackPanel>
+          </Grid>
+        </Grid>
+      </Grid>
+    </NavigationView>
+
+    <Border Grid.Row="2" Padding="12,6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="4,0,0,0">
+      <TextBlock Text="{Binding Status}" />
+    </Border>
+  </Grid>
+</Page>

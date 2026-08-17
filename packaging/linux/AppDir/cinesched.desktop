@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CineSched
+Comment=Film production scheduling
+Exec=CineSched.App
+Icon=cinesched
+Categories=AudioVideo;Office;ProjectManagement;
+Terminal=false

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CineSched.App (Desktop)": {
+      "commandName": "Project",
+      "compatibleTargetFramework": "desktop"
+    }
+  }
+}

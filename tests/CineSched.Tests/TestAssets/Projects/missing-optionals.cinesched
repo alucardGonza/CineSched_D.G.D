@@ -1,0 +1,8 @@
+{
+  "allScenes": [
+    {"id":"40404040-4040-4040-4040-404040404040","title":"INT. OLD SET - NIGHT","duration":1,"estimatedTime":15,"dayNightType":"NIGHT","cast":[]}
+  ],
+  "shootDays": [{"id":"50505050-5050-5050-5050-505050505050","date":"2026-08-18T00:00:00+0000","scenes":[]}],
+  "projectTitle": "Old Optional Fields",
+  "createdDate": "2026-08-16T00:00:00+0000"
+}

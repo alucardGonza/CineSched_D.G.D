@@ -1,12 +1,25 @@
-# CineSched (D.G.D Fork) - Film Production Scheduling & One-Line Schedule App
+# CineSched (D.G.D Fork) — cross-platform production scheduling
 
-A modern, high-performance macOS application for film and television scheduling — visual calendar scheduling, stripboard timeline cascading, vector shooting schedule (One-Line Schedule) PDF exports, bilingual (Español / English) localization, call sheet management, actor availability & conflict tracking, and script import.
+A cross-platform film and television scheduler built with .NET 10 and Uno Platform for Windows, Linux, and macOS. It includes visual calendar scheduling, stripboard timeline cascading, PDF reports, bilingual resources, call sheets, actor availability/conflict tracking, and script import. Compatibility with v4.5 projects is protected by representative fixtures and automated tests rather than by retaining the superseded Swift application.
 
-![Platform](https://img.shields.io/badge/platform-macOS-blue)
-![Swift](https://img.shields.io/badge/Swift-5.0-orange)
-![SwiftUI](https://img.shields.io/badge/SwiftUI-4.0-green)
-![Version](https://img.shields.io/badge/version-4.5.0-purple)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
+![.NET](https://img.shields.io/badge/.NET-10.0-purple)
+![Uno Platform](https://img.shields.io/badge/Uno%20Platform-6.6-teal)
+![Version](https://img.shields.io/badge/version-5.0.0-purple)
 ![License](https://img.shields.io/badge/license-GPL--v3-lightgrey)
+
+## Build and run
+
+The repository uses the .NET SDK selected by `global.json`.
+
+```powershell
+dotnet restore CineSched.slnx --locked-mode
+dotnet build CineSched.slnx -c Release --no-restore -warnaserror
+dotnet test tests/CineSched.Tests/CineSched.Tests.csproj -c Release --no-build
+dotnet run --project src/CineSched.App/CineSched.App.csproj -f net10.0-desktop
+```
+
+Core is organized by vertical slice. Every feature directory contains one `Models.cs` and one concrete `<Feature>Service.cs`; there are no ports, adapters, handlers, or entity-only layers. Unit and the four valuable end-to-end integration suites live in the single `CineSched.Tests` project. See [MIGRATION-PLAN.md](MIGRATION-PLAN.md), [SPEC.md](SPEC.md), and [ARCHITECTURE.md](ARCHITECTURE.md) for the migration contract.
 
 > **CineSched D.G.D Fork**: Enhanced with dynamic timeline cascade, 7-column production calendar, vector shooting schedule PDF generation, pure bilingual localization (Español / English), and independent calendar events.
 
@@ -45,7 +58,7 @@ A modern, high-performance macOS application for film and television scheduling 
 ### 📅 Visual Calendar Scheduling
 - Drag-and-drop scene strips onto calendar days
 - Color-coded scene types: orange for day, blue for night, green for custom (company moves, etc.) — red is reserved for flagged strips (see Conflicts & Blackout Days below)
-- Multi-select scenes on the calendar (⌘-click across any day, ⇧-click for a range within a day) and drag or right-click the whole group at once
+- Multi-select scenes on the calendar (Ctrl/Cmd-click across any day, Shift-click for a range within a day) and drag or right-click the whole group at once
 - **Send to Day…** — right-click a scene (or selection) and jump it to any day via a small graphical calendar picker, without dragging across a long schedule
 - **Remove from Day** — send a scene (or selection) back to the Boneyard from the calendar
 - Drag entire days (scenes + call sheet) to reschedule — swaps content if the target day is occupied
@@ -57,7 +70,7 @@ A modern, high-performance macOS application for film and television scheduling 
 - Create scenes with custom titles, durations, and time estimates
 - Day, Night, or Custom type for each scene — Custom strips require only a title, page count and time are optional
 - "Boneyard" sidebar for unscheduled scenes with sort options (Location, INT/EXT, Cast, Day/Night, Default), remembered between launches
-- Multi-select in the Boneyard (⌘-click / ⇧-click) and drag the whole group onto a calendar day at once
+- Multi-select in the Boneyard (Ctrl/Cmd-click / Shift-click) and drag the whole group onto a calendar day at once
 - Double-click to edit any scene; hover for a quick cast/summary tooltip
 - Flexible duration input (pages in eighths: "1 7/8", "15", etc.) and time input (hours or minutes: "4", "2:30", "15")
 
@@ -108,16 +121,16 @@ A modern, high-performance macOS application for film and television scheduling 
 - Editable crew roster (name, role, Daily-default checkbox), also editable in place
 - Reusable location roster
 
-### 🗂️ Native macOS Menus & Undo
+### 🗂️ Desktop Menus & Undo
 - Full **File** menu: New, Open, Open Recent, Import Script, Save, Save As, Export Schedule PDF, Export Days Out of Days, Export Scene Breakdowns
 - **Save** writes silently to the last-used file; **Save As** always prompts — file panels default to wherever your project already lives instead of always forcing Documents
-- **Edit** menu: Undo/Redo (⌘Z / ⇧⌘Z) for structural schedule changes — moving, removing, sending to a day, duplicating, or rearranging whole days
+- **Edit** menu: Undo/Redo for structural schedule changes — moving, removing, sending to a day, duplicating, or rearranging whole days
 - **View** menu: Dark Mode, alongside the native Toggle Sidebar
 - **Production** menu: Production Setup, Scan for Conflicts, Breakdown Browser, Hold-days toggle, Lock/Unlock Schedule, Schedule Lock Report
 
 ### 💾 Auto-Save & File Handling
 - Automatic project saving after any change
-- Manual Save/Save As for sharing projects as `.json` files, with Open Recent tracking your last 10 projects
+- Manual Save/Save As for sharing `.cinesched` projects, with Open Recent tracking your last 10 projects
 - "New" fully resets the project — clears all scenes, call sheets, title, and production info
 
 ### 🎨 Customization
@@ -128,19 +141,16 @@ A modern, high-performance macOS application for film and television scheduling 
 ## Installation
 
 ### Requirements
-- macOS 13.0 (Ventura) or later
-- Xcode 14.0 or later (for building from source)
+- Windows, Linux, or macOS
+- The .NET SDK selected by `global.json`
 
 ### Setup
-1. Clone or download this repository
-2. Open `CineSched.xcodeproj` in Xcode
-3. Build and run (⌘R)
+1. Clone or download this repository.
+2. Run the restore, build, test, and launch commands from [Build and run](#build-and-run).
+3. Use the scripts under `packaging/` when producing a distributable for a supported desktop RID.
 
-### First Launch (Unsigned App)
-CineSched isn't distributed through the Mac App Store and isn't signed with an Apple Developer certificate. The first time you open a built copy, macOS Gatekeeper will likely refuse to launch it. To open it:
-1. Drag `CineSched.app` into your Applications folder
-2. Open Terminal and run: `xattr -c /Applications/CineSched.app`
-3. Launch normally — this only needs to be done once per copy
+### Unsigned development packages
+Locally produced packages are not code-signed. Operating-system security prompts are therefore expected until the release pipeline is configured with the appropriate Windows, macOS, and Linux signing credentials.
 
 ## Usage
 
@@ -150,7 +160,7 @@ CineSched isn't distributed through the Mac App Store and isn't signed with an A
 2. **Set Date Range** — choose start and end dates, toggle Shift Schedule if you want existing scenes to move with a date change, and click Update Calendar
 3. **Set Up Production Info** *(recommended)* — open Production Setup from the Production menu: company, director, contact, cast (with unavailable dates if applicable), crew, and locations
 4. **Add Scenes** — manually via the sidebar's New Scene form, or import a Final Draft script
-5. **Sort and Select in the Boneyard** — group by Location, INT/EXT, Cast, or Day/Night; ⌘-click or ⇧-click to select multiple scenes at once
+5. **Sort and Select in the Boneyard** — group by Location, INT/EXT, Cast, or Day/Night; Ctrl/Cmd-click or Shift-click to select multiple scenes at once
 6. **Schedule Scenes** — drag from the Boneyard onto calendar days, individually or as a group
 7. **Tag Breakdowns** *(optional)* — use the Breakdown Browser to step through the script in order and tag Props, Wardrobe, VFX, and the rest
 8. **Lock the Schedule** *(recommended before contracts go out)* — Production → Lock Schedule, then keep working; any change to an actor's working days from there gets flagged automatically
@@ -186,53 +196,40 @@ CineSched isn't distributed through the Mac App Store and isn't signed with an A
 
 | Shortcut | Action |
 |---|---|
-| ⌘N | New Project |
-| ⌘O | Open… |
-| ⌘S | Save |
-| ⇧⌘S | Save As… |
-| ⌘E | Export Schedule to PDF |
-| ⇧⌘E | Export Days Out of Days |
-| ⌘Z | Undo |
-| ⇧⌘Z | Redo |
-| ⇧⌘P | Production Setup |
-| ⇧⌘K | Scan for Conflicts |
-| ⇧⌘B | Breakdown Browser |
-| ⇧⌘D | Toggle Dark Mode |
+| Ctrl/Cmd+N | New Project |
+| Ctrl/Cmd+O | Open… |
+| Ctrl/Cmd+S | Save |
+| Ctrl/Cmd+Shift+S | Save As… |
+| Ctrl/Cmd+E | Export Schedule to PDF |
+| Ctrl/Cmd+Shift+E | Export Days Out of Days |
+| Ctrl/Cmd+Z | Undo |
+| Ctrl/Cmd+Shift+Z | Redo |
+| Ctrl/Cmd+Shift+P | Production Setup |
+| Ctrl/Cmd+Shift+K | Scan for Conflicts |
+| Ctrl/Cmd+Shift+B | Breakdown Browser |
+| Ctrl/Cmd+Shift+D | Toggle Dark Mode |
 
 ## Project Structure
 
-```
+```text
 CineSched/
-├── CineSchedApp.swift              # App entry point, native menu commands
-├── Models.swift                    # Core data types: Scene, ShootDay, ProjectData, CallSheetData,
-│                                    #   ProductionInfo, CastMember, CrewMember, DateRange, ScheduleLock
-├── Parsers.swift                   # FractionParser and TimeParser utilities
-├── Formatting.swift                # Shared date/time/page formatting helpers
-├── FinalDraftParser.swift          # FDX script file parsing
-├── PDFExporter.swift                # Schedule PDF generation
-├── CallSheetExporter.swift          # Call sheet PDF generation
-├── DaysOutOfDaysExporter.swift      # Days Out of Days PDF generation
-├── BreakdownExporter.swift          # Scene breakdown sheet PDF generation
-├── ConflictScanner.swift            # Actor-availability conflict detection
-├── ScheduleLockScanner.swift        # Schedule-lock working-day change detection
-├── RecentFilesStore.swift           # Recent-files tracking, app-wide notifications
-├── ProjectStore.swift               # Save, load, auto-save, and all file operations
-├── ContentView.swift                 # Root view: state, sidebar, toolbar wiring
-├── CalendarView.swift                # Calendar grid, drag-and-drop, scene cards
-├── CallSheetEditor.swift             # Per-day call sheet editor sheet
-├── ProductionSetupSheet.swift        # Cast, crew, locations, availability
-├── SceneEditSheet.swift              # Scene editor, including breakdown tagging
-├── NewSceneInputView.swift           # Sidebar form for adding new scenes
-├── ConflictReportSheet.swift         # Conflict scan results
-├── ScheduleLockReportSheet.swift     # Schedule lock change report
-├── SendToDaySheet.swift              # Graphical day picker for Send to Day
-└── HoverTooltip.swift                # Fast custom hover tooltip
+├── src/
+│   ├── CineSched.App/               # Uno shell, view model and desktop integrations
+│   └── CineSched.Core/              # UI-independent vertical feature slices
+├── tests/
+│   └── CineSched.Tests/             # Unit and valuable integration tests
+├── packaging/                       # Windows, Linux and macOS packaging
+├── .github/workflows/               # Build, test and publish automation
+├── CineSched.slnx                   # .NET solution
+├── ARCHITECTURE.md                  # Dependency and source-layout contract
+├── MIGRATION-PLAN.md                # Migration phases and acceptance criteria
+└── SPEC.md                          # Gherkin feature specification
 ```
 
 ## File Formats
 
-### Project Files (.json)
-Save and share your schedules as JSON files containing all scenes, calendar days, call sheets, production info (cast, crew, locations, availability), and any active schedule lock.
+### Project Files (.cinesched)
+Save and share schedules as `.cinesched` JSON documents containing all scenes, calendar days, call sheets, production info (cast, crew, locations, availability), and any active schedule lock.
 
 ### Final Draft Scripts (.fdx)
 Import scripts directly from Final Draft — extracts scene headings automatically, preserving scene numbers from the script.
@@ -267,11 +264,11 @@ CineSched is currently macOS-only, but the `.json` project format is simple and 
 
 ## Contributing
 
-Contributions are welcome — bug fixes, new features, documentation, or a Windows port. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+Contributions are welcome — bug fixes, new features, documentation, packaging, and platform validation. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## Credits
 
-Built with SwiftUI for macOS by a film production professional who needed a better way to schedule shoots.
+Originally created for macOS and migrated to .NET 10 with Uno Platform for cross-platform desktop use.
 
 Special thanks to:
 - **Final Draft** for the `.fdx` format
@@ -287,5 +284,5 @@ For issues or questions, please open a GitHub issue.
 
 ---
 
-**Version**: 4.0
-**Compatible With**: macOS 13.0+, Final Draft 12+
+**Version**: 5.0
+**Compatible With**: Windows, Linux, macOS, and Final Draft `.fdx` files

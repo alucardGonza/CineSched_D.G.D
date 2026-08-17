@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CineSched.App/CineSched.App.csproj" />
+    <Project Path="src/CineSched.Core/CineSched.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CineSched.Tests/CineSched.Tests.csproj" />
+  </Folder>
+</Solution>

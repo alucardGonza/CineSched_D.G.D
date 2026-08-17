@@ -5,3 +5,10 @@ project.xcworkspace
 xcuserdata
 DerivedData
 build/
+.codegraph/
+.vs/
+bin/
+obj/
+TestResults/
+artifacts/
+*.user
