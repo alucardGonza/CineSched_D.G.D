@@ -29,6 +29,8 @@ public sealed class DateRange
     public bool Contains(DateTimeOffset date) =>
         DateOnly.FromDateTime(date.LocalDateTime) >= DateOnly.FromDateTime(Start.LocalDateTime) &&
         DateOnly.FromDateTime(date.LocalDateTime) <= DateOnly.FromDateTime(End.LocalDateTime);
+
+    public string DisplayString => $"{Start:yyyy-MM-dd} – {End:yyyy-MM-dd}";
 }
 
 public sealed class CastMember
@@ -41,6 +43,11 @@ public sealed class CastMember
     public string DisplayString => string.IsNullOrEmpty(ActorName)
         ? CharacterName
         : $"{ActorName} — {CharacterName}";
+
+    public string UnavailableSummary => UnavailableRanges.Count == 0
+        ? "Available"
+        : string.Join(", ", UnavailableRanges.OrderBy(range => range.Start)
+            .Select(range => $"{range.Start:yyyy-MM-dd}–{range.End:yyyy-MM-dd}"));
 }
 
 public sealed class ProductionInfo

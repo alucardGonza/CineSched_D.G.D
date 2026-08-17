@@ -75,6 +75,19 @@ public sealed record SceneInput(
     string EstimatedTime = "0",
     DayNightType DayNightType = DayNightType.Day,
     IReadOnlyList<string>? Cast = null,
-    string Summary = "");
+    string Summary = "",
+    string RealLocation = "",
+    string LocationAddress = "",
+    IReadOnlyList<string>? Extras = null,
+    IReadOnlyList<string>? Props = null,
+    IReadOnlyList<string>? SetDressing = null,
+    IReadOnlyList<string>? Wardrobe = null,
+    IReadOnlyList<string>? MakeupHair = null,
+    IReadOnlyList<string>? Vehicles = null,
+    IReadOnlyList<string>? SpecialEquipment = null,
+    IReadOnlyList<string>? Stunts = null,
+    IReadOnlyList<string>? Sfx = null,
+    IReadOnlyList<string>? Vfx = null,
+    string BreakdownNotes = "");
 
 public sealed record SceneSearchResult(Scene Scene, DateTimeOffset? DayDate);

@@ -29,6 +29,7 @@ internal static class ServiceRegistration
         services.AddSingleton<SettingsService>();
         services.AddSingleton<FileDialogService>();
         services.AddSingleton<DialogService>();
+        services.AddSingleton<ClipboardService>();
         services.AddSingleton<PreferencesService>();
         services.AddSingleton<RecentFilesService>();
         services.AddSingleton<AutosaveService>();

@@ -33,8 +33,21 @@ public sealed partial class SceneService(ProjectService projects)
             Duration = duration.Value,
             EstimatedTime = estimated.Value,
             DayNightType = input.DayNightType,
-            Cast = input.Cast?.Select(value => value.Trim()).Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [],
-            Summary = input.Summary.Trim()
+            Cast = Normalize(input.Cast),
+            Summary = input.Summary.Trim(),
+            RealLocation = input.RealLocation.Trim(),
+            LocationAddress = input.LocationAddress.Trim(),
+            Extras = Normalize(input.Extras),
+            Props = Normalize(input.Props),
+            SetDressing = Normalize(input.SetDressing),
+            Wardrobe = Normalize(input.Wardrobe),
+            MakeupHair = Normalize(input.MakeupHair),
+            Vehicles = Normalize(input.Vehicles),
+            SpecialEquipment = Normalize(input.SpecialEquipment),
+            Stunts = Normalize(input.Stunts),
+            Sfx = Normalize(input.Sfx),
+            Vfx = Normalize(input.Vfx),
+            BreakdownNotes = input.BreakdownNotes.Trim()
         };
         AutoExtractSceneNumber(scene);
 
@@ -72,6 +85,48 @@ public sealed partial class SceneService(ProjectService projects)
 
         projects.Apply(document, "scene.edited", structural: false);
         return Result<Scene>.Success(updated);
+    }
+
+    public Result<Scene> EditScene(Guid sceneId, SceneInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.Title))
+            return Result<Scene>.Failure("scene.validation-failed", "A scene title is required.");
+        var duration = ParseDuration(input.Duration, input.DayNightType == DayNightType.Custom);
+        if (!duration.IsSuccess)
+            return Result<Scene>.Failure(duration.Error!.Code, duration.Error.Message, duration.Error.Details);
+        var estimated = ParseEstimatedTime(input.EstimatedTime, input.DayNightType == DayNightType.Custom);
+        if (!estimated.IsSuccess)
+            return Result<Scene>.Failure(estimated.Error!.Code, estimated.Error.Message, estimated.Error.Details);
+
+        var document = projects.Snapshot();
+        var current = document.AllScenes.Concat(document.ShootDays.SelectMany(day => day.Scenes))
+            .FirstOrDefault(scene => scene.Id == sceneId);
+        if (current is null)
+            return Result<Scene>.Failure("scene.not-found", "The scene no longer exists.");
+
+        current.Title = input.Title.Trim();
+        current.SceneNumber = input.SceneNumber.Trim();
+        current.Duration = duration.Value;
+        current.EstimatedTime = estimated.Value;
+        current.DayNightType = input.DayNightType;
+        current.Cast = Normalize(input.Cast);
+        current.Summary = input.Summary.Trim();
+        current.RealLocation = input.RealLocation.Trim();
+        current.LocationAddress = input.LocationAddress.Trim();
+        current.Extras = Normalize(input.Extras);
+        current.Props = Normalize(input.Props);
+        current.SetDressing = Normalize(input.SetDressing);
+        current.Wardrobe = Normalize(input.Wardrobe);
+        current.MakeupHair = Normalize(input.MakeupHair);
+        current.Vehicles = Normalize(input.Vehicles);
+        current.SpecialEquipment = Normalize(input.SpecialEquipment);
+        current.Stunts = Normalize(input.Stunts);
+        current.Sfx = Normalize(input.Sfx);
+        current.Vfx = Normalize(input.Vfx);
+        current.BreakdownNotes = input.BreakdownNotes.Trim();
+        AutoExtractSceneNumber(current);
+        projects.Apply(document, "scene.edited", structural: false);
+        return Result<Scene>.Success(current);
     }
 
     public Result<Scene> DuplicateScene(Guid sceneId)
@@ -317,6 +372,12 @@ public sealed partial class SceneService(ProjectService projects)
         eighths = (int)Math.Round((decimal)numerator / denominator * 8m, MidpointRounding.AwayFromZero);
         return true;
     }
+
+    private static List<string> Normalize(IEnumerable<string>? values) => values?
+        .Select(value => value.Trim())
+        .Where(value => value.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList() ?? [];
 
     private static string GetLocationSortKey(Scene scene) => GetDecorado(scene);
 

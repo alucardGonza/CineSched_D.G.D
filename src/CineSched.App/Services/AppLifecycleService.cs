@@ -55,6 +55,27 @@ public sealed class AppLifecycleService(
         return await OpenAsync(resolved.Value!, cancellationToken);
     }
 
+    public async ValueTask<Result<bool>> OpenRecoveryAsync(
+        StorageFile file,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var stream = await file.OpenStreamForReadAsync();
+            var opened = await projects.OpenAsync(stream, cancellationToken);
+            if (!opened.IsSuccess)
+                return Result<bool>.Failure(opened.Error!.Code, opened.Error.Message, opened.Error.Details);
+            AssociatedFile = null;
+            autosave.DismissRecovery();
+            projects.Update(_ => { }, "project.recovered", structural: false);
+            return Result<bool>.Success(true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Result<bool>.Failure("project.read-failed", exception.Message);
+        }
+    }
+
     public async ValueTask<Result<bool>> SaveAsync(CancellationToken cancellationToken = default)
     {
         if (AssociatedFile is null)
@@ -119,7 +140,7 @@ public sealed class AppLifecycleService(
             }
 
             projects.MarkSaved(snapshot.Revision);
-            await autosave.SaveNowAsync(snapshot, cancellationToken);
+            await autosave.SaveNowAsync(snapshot, markRecoverable: false, cancellationToken: cancellationToken);
             if (associateOnSuccess) AssociatedFile = file;
             await recentFiles.AddAsync(file, cancellationToken);
             return Result<bool>.Success(true);

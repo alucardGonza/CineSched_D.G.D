@@ -2,6 +2,7 @@ namespace CineSched.App.Services;
 
 public sealed class AutosaveService(ProjectService projects) : IDisposable
 {
+    private const string RecoveryFlagKey = "autosave-needs-recovery";
     private CancellationTokenSource? _pending;
 
     public void Start() => projects.Changed += OnProjectChanged;
@@ -15,6 +16,7 @@ public sealed class AutosaveService(ProjectService projects) : IDisposable
 
     public async ValueTask<StorageFile?> GetRecoveryFileAsync()
     {
+        if (ApplicationData.Current.LocalSettings.Values[RecoveryFlagKey] is not true) return null;
         try
         {
             return await ApplicationData.Current.LocalFolder.GetFileAsync("autosave.cinesched");
@@ -27,6 +29,7 @@ public sealed class AutosaveService(ProjectService projects) : IDisposable
 
     public async ValueTask<Result<Unit>> SaveNowAsync(
         ProjectSnapshot snapshot,
+        bool markRecoverable = true,
         CancellationToken cancellationToken = default)
     {
         var folderPath = ApplicationData.Current.LocalFolder.Path;
@@ -58,6 +61,7 @@ public sealed class AutosaveService(ProjectService projects) : IDisposable
 
             File.Move(temporaryPath, destinationPath, overwrite: true);
             temporaryPath = string.Empty;
+            ApplicationData.Current.LocalSettings.Values[RecoveryFlagKey] = markRecoverable;
             return Result<Unit>.Success(Unit.Value);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -75,6 +79,8 @@ public sealed class AutosaveService(ProjectService projects) : IDisposable
         }
     }
 
+    public void DismissRecovery() => ApplicationData.Current.LocalSettings.Values[RecoveryFlagKey] = false;
+
     private void OnProjectChanged(object? sender, ProjectChangedEvent change)
     {
         if (!change.IsDirty) return;
@@ -89,7 +95,7 @@ public sealed class AutosaveService(ProjectService projects) : IDisposable
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-            await SaveNowAsync(projects.GetSnapshot(), cancellationToken);
+            await SaveNowAsync(projects.GetSnapshot(), markRecoverable: true, cancellationToken: cancellationToken);
         }
         catch (OperationCanceledException)
         {

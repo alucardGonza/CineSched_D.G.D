@@ -107,6 +107,53 @@ public sealed class SceneServiceTests
     }
 
     [Fact]
+    public void InvalidFormEdit_DoesNotModifyExistingScene()
+    {
+        var projects = TestData.Project();
+        var scene = TestData.Scene("1", "ORIGINAL");
+        projects.Update(document => document.AllScenes.Add(scene));
+
+        var result = new SceneService(projects).EditScene(scene.Id,
+            new SceneInput("CHANGED", "2", "bad", "15", DayNightType.Night, ["ANA"], "Changed"));
+
+        Assert.False(result.IsSuccess);
+        var unchanged = projects.GetSnapshot().Document.AllScenes.Single();
+        Assert.Equal("ORIGINAL", unchanged.Title);
+        Assert.Equal("1", unchanged.SceneNumber);
+    }
+
+    [Fact]
+    public void FormEdit_UpdatesEveryBreakdownCategoryWithoutChangingIdentity()
+    {
+        var projects = TestData.Project();
+        var scene = TestData.Scene("1", "ORIGINAL");
+        projects.Update(document => document.AllScenes.Add(scene));
+        var input = new SceneInput(
+            "INT. STAGE - DAY", "1", "7/8", "30", DayNightType.Day, ["ANA"], "Summary",
+            "Stage", "100 Main", ["BG"], ["Key"], ["Table"], ["Coat"], ["Rain makeup"],
+            ["Car"], ["Crane"], ["Fall"], ["Smoke"], ["Sky"], "Safety meeting");
+
+        var result = new SceneService(projects).EditScene(scene.Id, input);
+        var updated = projects.GetSnapshot().Document.AllScenes.Single();
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(scene.Id, updated.Id);
+        Assert.Equal("Stage", updated.RealLocation);
+        Assert.Equal("100 Main", updated.LocationAddress);
+        Assert.Equal("BG", Assert.Single(updated.Extras));
+        Assert.Equal("Key", Assert.Single(updated.Props));
+        Assert.Equal("Table", Assert.Single(updated.SetDressing));
+        Assert.Equal("Coat", Assert.Single(updated.Wardrobe));
+        Assert.Equal("Rain makeup", Assert.Single(updated.MakeupHair));
+        Assert.Equal("Car", Assert.Single(updated.Vehicles));
+        Assert.Equal("Crane", Assert.Single(updated.SpecialEquipment));
+        Assert.Equal("Fall", Assert.Single(updated.Stunts));
+        Assert.Equal("Smoke", Assert.Single(updated.Sfx));
+        Assert.Equal("Sky", Assert.Single(updated.Vfx));
+        Assert.Equal("Safety meeting", updated.BreakdownNotes);
+    }
+
+    [Fact]
     public void SortAndSearch_AreQueriesAndDoNotReorderPersistence()
     {
         var projects = TestData.Project();

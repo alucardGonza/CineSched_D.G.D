@@ -31,6 +31,21 @@
         <NavigationViewItem Content="{Binding ReportsLabel}" Icon="Document" Tag="reports" />
         <NavigationViewItem Content="{Binding SettingsLabel}" Icon="Setting" Tag="settings" />
       </NavigationView.MenuItems>
+      <NavigationView.PaneFooter>
+        <StackPanel Spacing="4" Margin="4,8">
+          <TextBlock Text="Recent projects" FontWeight="SemiBold" />
+          <ListView ItemsSource="{Binding RecentFiles}" IsItemClickEnabled="True"
+                    ItemClick="RecentFiles_ItemClick" MaxHeight="180"
+                    SelectionMode="None">
+            <ListView.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" MaxWidth="220" TextTrimming="CharacterEllipsis"
+                           ToolTipService.ToolTip="{Binding}" />
+              </DataTemplate>
+            </ListView.ItemTemplate>
+          </ListView>
+        </StackPanel>
+      </NavigationView.PaneFooter>
 
       <Grid Padding="20">
         <Grid.RowDefinitions>
@@ -57,19 +72,32 @@
                   </Grid.RowDefinitions>
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="Boneyard" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <Button Content="+ Scene" Command="{Binding AddSceneCommand}" />
+                    <Button Content="+ Scene" Click="AddScene_Click" />
+                    <Button Content="Copy" Command="{Binding CopySceneCommand}" />
                   </StackPanel>
-                  <TextBox Grid.Row="1" PlaceholderText="Search title, cast or summary"
-                           Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,8" />
+                  <StackPanel Grid.Row="1" Spacing="4" Margin="0,8">
+                    <TextBox PlaceholderText="Search title, cast or summary"
+                             Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox Header="Sort" ItemsSource="{Binding BoneyardSorts}"
+                              SelectedItem="{Binding SelectedBoneyardSort, Mode=TwoWay}" />
+                  </StackPanel>
                   <ListView Grid.Row="2" ItemsSource="{Binding Boneyard}" SelectionMode="Extended"
                             CanDragItems="True" DragItemsStarting="Boneyard_DragItemsStarting"
                             SelectedItem="{Binding SelectedBoneyardScene, Mode=TwoWay}">
                     <ListView.ItemTemplate>
                       <DataTemplate>
-                        <StackPanel Padding="4">
-                          <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" />
-                          <TextBlock Text="{Binding Summary}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
+                        <Grid Padding="4" ColumnSpacing="6" PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited">
+                          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                          <StackPanel>
+                            <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Summary}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <Button Content="Edit" Tag="{Binding}" Click="EditScene_Click" />
+                            <Button Content="Duplicate" Tag="{Binding}" Click="DuplicateScene_Click" />
+                            <Button Content="Delete" Tag="{Binding}" Click="DeleteScene_Click" />
+                          </StackPanel>
+                        </Grid>
                       </DataTemplate>
                     </ListView.ItemTemplate>
                   </ListView>
@@ -77,49 +105,66 @@
                 </Grid>
               </Border>
 
-              <ListView Grid.Column="1" ItemsSource="{Binding ShootDays}"
-                        SelectedItem="{Binding SelectedDay, Mode=TwoWay}">
-                <ListView.ItemTemplate>
-                  <DataTemplate>
-                    <Border Padding="12" Margin="0,0,0,8" CornerRadius="8" AllowDrop="True" Drop="CalendarDay_Drop"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                      <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="150" />
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Scenes}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate><TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" /></DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <StackPanel Grid.Column="2">
-                          <TextBlock Text="{Binding TotalDuration}" HorizontalAlignment="Right" />
-                          <TextBlock Text="eighths" Opacity="0.65" FontSize="11" />
-                        </StackPanel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ListView.ItemTemplate>
-              </ListView>
+              <Grid Grid.Column="1">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                  <DatePicker x:Name="RangeStart" Header="Start" />
+                  <DatePicker x:Name="RangeEnd" Header="End" />
+                  <CheckBox x:Name="ShiftSchedule" Content="Shift existing schedule" VerticalAlignment="Bottom" Margin="0,0,0,6" />
+                  <Button Content="Apply range" Click="ChangeRange_Click" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                </StackPanel>
+                <ListView Grid.Row="1" ItemsSource="{Binding ShootDays}" CanDragItems="True"
+                          DragItemsStarting="ShootDays_DragItemsStarting"
+                          SelectedItem="{Binding SelectedDay, Mode=TwoWay}">
+                  <ListView.ItemTemplate>
+                    <DataTemplate>
+                      <Border Padding="12" Margin="0,0,0,8" CornerRadius="8" AllowDrop="True" DragOver="Move_DragOver" Drop="CalendarDay_Drop"
+                              PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited"
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid ColumnSpacing="12">
+                          <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
+                          <ListView Grid.Column="1" ItemsSource="{Binding Scenes}" SelectionMode="Extended" CanDragItems="True"
+                                    DragItemsStarting="DayScenes_DragItemsStarting">
+                            <ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" /><Button Grid.Column="1" Content="Remove" Tag="{Binding}" Click="RemoveFromDay_Click" /></Grid></DataTemplate></ListView.ItemTemplate>
+                          </ListView>
+                          <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding TotalDuration}" HorizontalAlignment="Right" />
+                            <TextBlock Text="eighths" Opacity="0.65" FontSize="11" />
+                            <Button Content="Blackout" Tag="{Binding}" Click="ToggleBlackout_Click" Margin="0,6,0,0" />
+                            <Button Content="All weekdays" Tag="{Binding}" Click="ToggleWeekdayBlackout_Click" Margin="0,4,0,0" />
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListView.ItemTemplate>
+                </ListView>
+              </Grid>
             </Grid>
           </PivotItem>
 
           <PivotItem>
             <Grid>
               <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-              <TextBlock Text="Selected day stripboard" Style="{ThemeResource TitleTextBlockStyle}" Margin="0,0,0,12" />
-              <ListView Grid.Row="1" ItemsSource="{Binding SelectedDayScenes}">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                <TextBlock Text="Selected day stripboard" Style="{ThemeResource TitleTextBlockStyle}" />
+                <Button Content="+ Banner" Click="AddBanner_Click" />
+                <Button Content="+ Meal" Click="AddMeal_Click" />
+                <Button Content="+ Event" Click="AddEvent_Click" />
+              </StackPanel>
+              <ListView Grid.Row="1" ItemsSource="{Binding SelectedDayScenes}" SelectionMode="Extended"
+                        CanDragItems="True" DragItemsStarting="Stripboard_DragItemsStarting">
                 <ListView.ItemTemplate>
                   <DataTemplate>
-                    <Border Padding="12" Margin="0,0,0,6" CornerRadius="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Border Padding="12" Margin="0,0,0,6" CornerRadius="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            AllowDrop="True" DragOver="Move_DragOver" Drop="StripScene_Drop"
+                            PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited">
                       <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="100" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="100" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding SceneNumber}" FontWeight="Bold" />
                         <TextBlock Grid.Column="1" Text="{Binding Title}" />
                         <TextBlock Grid.Column="2" Text="{Binding EstimatedTime}" HorizontalAlignment="Right" />
+                        <Button Grid.Column="3" Content="Edit" Tag="{Binding}" Click="EditScene_Click" />
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -129,12 +174,86 @@
           </PivotItem>
 
           <PivotItem>
-            <StackPanel Spacing="12" MaxWidth="700" HorizontalAlignment="Left">
-              <TextBlock Text="Production Setup" Style="{ThemeResource TitleTextBlockStyle}" />
-              <TextBlock Text="Cast, crew and location data are stored with the project and synchronized by stable IDs." TextWrapping="Wrap" />
-              <InfoBar IsOpen="True" Severity="Informational" Title="Core ready"
-                       Message="ProductionService, CallSheetService, conflicts and schedule lock are available to feature editors." />
-            </StackPanel>
+            <Pivot>
+              <PivotItem Header="Production">
+                <ScrollViewer>
+                  <StackPanel Spacing="8" MaxWidth="700" HorizontalAlignment="Left">
+                    <TextBlock Text="Production Setup" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBox Header="Company" Text="{Binding ProductionDraft.CompanyName, Mode=TwoWay}" />
+                    <TextBox Header="Director" Text="{Binding ProductionDraft.DirectorName, Mode=TwoWay}" />
+                    <TextBox Header="Director phone" Text="{Binding ProductionDraft.DirectorPhone, Mode=TwoWay}" />
+                    <TextBox Header="Producer" Text="{Binding ProductionDraft.ProducerName, Mode=TwoWay}" />
+                    <TextBox Header="Producer phone" Text="{Binding ProductionDraft.ProducerPhone, Mode=TwoWay}" />
+                    <TextBox Header="1st AD" Text="{Binding ProductionDraft.AdName, Mode=TwoWay}" />
+                    <TextBox Header="AD phone" Text="{Binding ProductionDraft.AdPhone, Mode=TwoWay}" />
+                    <TextBox Header="Contact" Text="{Binding ProductionDraft.ContactNumber, Mode=TwoWay}" />
+                    <TextBox Header="Default lunch" Text="{Binding ProductionDraft.DefaultLunchTime, Mode=TwoWay}" />
+                    <Button Content="Save production" Command="{Binding SaveProductionCommand}" HorizontalAlignment="Left" />
+                  </StackPanel>
+                </ScrollViewer>
+              </PivotItem>
+              <PivotItem Header="Rosters">
+                <Grid ColumnSpacing="12">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Cast" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="Add" Click="AddCast_Click" /></StackPanel>
+                    <ListView ItemsSource="{Binding CastRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Spacing="2"><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding DisplayString}" Width="180" /><Button Content="Edit" Tag="{Binding}" Click="EditCast_Click" /><Button Content="Availability" Tag="{Binding}" Click="EditAvailability_Click" /><Button Content="Delete" Tag="{Binding}" Click="DeleteCast_Click" /></StackPanel><TextBlock Text="{Binding UnavailableSummary}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Crew" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="Add" Click="AddCrew_Click" /></StackPanel>
+                    <ListView ItemsSource="{Binding CrewRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding DisplayString}" Width="180" /><Button Content="Edit" Tag="{Binding}" Click="EditCrew_Click" /><Button Content="Delete" Tag="{Binding}" Click="DeleteCrew_Click" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Locations" Style="{ThemeResource SubtitleTextBlockStyle}" /><Button Content="Add" Click="AddLocation_Click" /></StackPanel>
+                    <ListView ItemsSource="{Binding LocationRoster}"><ListView.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="{Binding Name}" Width="180" /><Button Content="Edit" Tag="{Binding}" Click="EditLocation_Click" /><Button Content="Delete" Tag="{Binding}" Click="DeleteLocation_Click" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                </Grid>
+              </PivotItem>
+              <PivotItem Header="Call Sheet">
+                <ScrollViewer>
+                  <StackPanel Spacing="8" MaxWidth="700" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Initialize from day" Command="{Binding InitializeCallSheetCommand}" /><Button Content="Select crew" Click="SelectCallSheetCrew_Click" /><Button Content="Save call sheet" Command="{Binding SaveCallSheetCommand}" /></StackPanel>
+                    <TextBox Header="General call" Text="{Binding CallSheetDraft.GeneralCallTime, Mode=TwoWay}" />
+                    <TextBox Header="Work day schedule" Text="{Binding CallSheetDraft.WorkDaySchedule, Mode=TwoWay}" />
+                    <TextBox Header="Ready to shoot" Text="{Binding CallSheetDraft.ReadyToShootTime, Mode=TwoWay}" />
+                    <TextBox Header="Lunch" Text="{Binding CallSheetDraft.LunchTime, Mode=TwoWay}" />
+                    <TextBox Header="Snack" Text="{Binding CallSheetDraft.SnackTime, Mode=TwoWay}" />
+                    <TextBox Header="Dinner" Text="{Binding CallSheetDraft.DinnerTime, Mode=TwoWay}" />
+                    <TextBox Header="Wrap" Text="{Binding CallSheetDraft.WrapTime, Mode=TwoWay}" />
+                    <TextBox Header="Quote of the day" Text="{Binding CallSheetDraft.QuoteOfTheDay, Mode=TwoWay}" />
+                    <TextBox Header="Production manager contact" Text="{Binding CallSheetDraft.ProdManagerContact, Mode=TwoWay}" />
+                    <TextBox Header="AD contact" Text="{Binding CallSheetDraft.AdContact, Mode=TwoWay}" />
+                    <TextBox Header="Weather temperature" Text="{Binding CallSheetDraft.WeatherTemp, Mode=TwoWay}" />
+                    <TextBox Header="Weather conditions" Text="{Binding CallSheetDraft.WeatherCondition, Mode=TwoWay}" />
+                    <TextBox Header="Precipitation / wind" Text="{Binding CallSheetDraft.WeatherPrecipWind, Mode=TwoWay}" />
+                    <TextBox Header="Sunrise / sunset" Text="{Binding CallSheetDraft.SunTimes, Mode=TwoWay}" />
+                    <TextBox Header="Basecamp" Text="{Binding CallSheetDraft.BasecampLocation, Mode=TwoWay}" />
+                    <TextBox Header="Nearest hospital" Text="{Binding CallSheetDraft.NearestHospital, Mode=TwoWay}" />
+                    <TextBlock Text="Cast calls" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CallSheetDraft.CastCallEntries}">
+                      <ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="110" /><ColumnDefinition Width="100" /><ColumnDefinition Width="90" /><ColumnDefinition Width="90" /></Grid.ColumnDefinitions><TextBox Header="Character" Text="{Binding CharacterName, Mode=TwoWay}" /><TextBox Grid.Column="1" Header="Actor" Text="{Binding ActorName, Mode=TwoWay}" /><TextBox Grid.Column="2" Header="Scenes" Text="{Binding SceneNumbers, Mode=TwoWay}" /><TextBox Grid.Column="3" Header="On set" Text="{Binding OnSetTime, Mode=TwoWay}" /><TextBox Grid.Column="4" Header="Wrap" Text="{Binding WrapTime, Mode=TwoWay}" /></Grid></DataTemplate></ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock Text="Locations" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CallSheetDraft.Locations}"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ListView.ItemTemplate></ListView>
+                    <TextBox Header="Notes" Text="{Binding CallSheetDraft.Notes, Mode=TwoWay}" AcceptsReturn="True" Height="100" />
+                  </StackPanel>
+                </ScrollViewer>
+              </PivotItem>
+              <PivotItem Header="Conflicts &amp; Lock">
+                <Grid ColumnSpacing="16">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="Conflicts" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding CurrentConflicts}"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding CharacterName}" /></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Lock baseline" Command="{Binding LockScheduleCommand}" /><Button Content="Unlock" Command="{Binding UnlockScheduleCommand}" /></StackPanel>
+                    <TextBlock Text="Schedule lock changes" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <ListView ItemsSource="{Binding ScheduleLockChanges}"><ListView.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding ActorDisplayName}" FontWeight="SemiBold" /><TextBlock Text="Working days changed" Opacity="0.7" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                  </StackPanel>
+                </Grid>
+              </PivotItem>
+            </Pivot>
           </PivotItem>
 
           <PivotItem>
