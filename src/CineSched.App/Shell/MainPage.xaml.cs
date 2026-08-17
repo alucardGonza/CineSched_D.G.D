@@ -312,6 +312,7 @@ public sealed partial class MainPage : Page
         var sfx = AddText(panel, "SFX (comma separated)", Csv(scene?.Sfx));
         var vfx = AddText(panel, "VFX (comma separated)", Csv(scene?.Vfx));
         var breakdownNotes = AddText(panel, "Breakdown notes", scene?.BreakdownNotes ?? string.Empty, true);
+        var customStart = AddText(panel, "Fixed start time (optional)", scene?.CustomStartTime ?? string.Empty);
         if (await ShowEditorAsync(scene is null ? "New scene" : "Edit scene", panel, "Save") != ContentDialogResult.Primary) return;
         var input = new SceneInput(
             Title: title.Text,
@@ -333,7 +334,8 @@ public sealed partial class MainPage : Page
             Stunts: SplitCsv(stunts.Text),
             Sfx: SplitCsv(sfx.Text),
             Vfx: SplitCsv(vfx.Text),
-            BreakdownNotes: breakdownNotes.Text);
+            BreakdownNotes: breakdownNotes.Text,
+            CustomStartTime: customStart.Text);
         var result = _viewModel.SaveScene(scene, input);
         if (!result.IsSuccess) await _dialogs.ShowErrorAsync("Scene validation", result.Error!.Message);
     }

@@ -88,6 +88,7 @@ public sealed record SceneInput(
     IReadOnlyList<string>? Stunts = null,
     IReadOnlyList<string>? Sfx = null,
     IReadOnlyList<string>? Vfx = null,
-    string BreakdownNotes = "");
+    string BreakdownNotes = "",
+    string CustomStartTime = "");
 
 public sealed record SceneSearchResult(Scene Scene, DateTimeOffset? DayDate);

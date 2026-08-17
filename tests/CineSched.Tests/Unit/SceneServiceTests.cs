@@ -131,7 +131,7 @@ public sealed class SceneServiceTests
         var input = new SceneInput(
             "INT. STAGE - DAY", "1", "7/8", "30", DayNightType.Day, ["ANA"], "Summary",
             "Stage", "100 Main", ["BG"], ["Key"], ["Table"], ["Coat"], ["Rain makeup"],
-            ["Car"], ["Crane"], ["Fall"], ["Smoke"], ["Sky"], "Safety meeting");
+            ["Car"], ["Crane"], ["Fall"], ["Smoke"], ["Sky"], "Safety meeting", "09:30 AM");
 
         var result = new SceneService(projects).EditScene(scene.Id, input);
         var updated = projects.GetSnapshot().Document.AllScenes.Single();
@@ -151,6 +151,7 @@ public sealed class SceneServiceTests
         Assert.Equal("Smoke", Assert.Single(updated.Sfx));
         Assert.Equal("Sky", Assert.Single(updated.Vfx));
         Assert.Equal("Safety meeting", updated.BreakdownNotes);
+        Assert.Equal("09:30 AM", updated.CustomStartTime);
     }
 
     [Fact]

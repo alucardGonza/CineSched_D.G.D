@@ -47,7 +47,8 @@ public sealed partial class SceneService(ProjectService projects)
             Stunts = Normalize(input.Stunts),
             Sfx = Normalize(input.Sfx),
             Vfx = Normalize(input.Vfx),
-            BreakdownNotes = input.BreakdownNotes.Trim()
+            BreakdownNotes = input.BreakdownNotes.Trim(),
+            CustomStartTime = input.CustomStartTime.Trim()
         };
         AutoExtractSceneNumber(scene);
 
@@ -124,6 +125,7 @@ public sealed partial class SceneService(ProjectService projects)
         current.Sfx = Normalize(input.Sfx);
         current.Vfx = Normalize(input.Vfx);
         current.BreakdownNotes = input.BreakdownNotes.Trim();
+        current.CustomStartTime = input.CustomStartTime.Trim();
         AutoExtractSceneNumber(current);
         projects.Apply(document, "scene.edited", structural: false);
         return Result<Scene>.Success(current);
