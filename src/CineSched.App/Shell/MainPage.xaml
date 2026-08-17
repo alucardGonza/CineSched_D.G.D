@@ -12,23 +12,24 @@
     </Grid.RowDefinitions>
 
     <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
-      <AppBarButton Icon="Add" Label="New" Command="{Binding NewProjectCommand}" />
-      <AppBarButton Icon="OpenFile" Label="Open" Command="{Binding OpenProjectCommand}" />
-      <AppBarButton Icon="Save" Label="Save" Command="{Binding SaveProjectCommand}" />
-      <AppBarButton Icon="SaveLocal" Label="Save As" Command="{Binding SaveAsProjectCommand}" />
+      <AppBarButton Icon="Add" Label="{Binding NewLabel}" Command="{Binding NewProjectCommand}" />
+      <AppBarButton Icon="OpenFile" Label="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" />
+      <AppBarButton Icon="Save" Label="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" />
+      <AppBarButton Icon="SaveLocal" Label="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" />
       <AppBarSeparator />
-      <AppBarButton Icon="Document" Label="Import Script" Command="{Binding ImportScriptCommand}" />
-      <AppBarButton Icon="Undo" Label="Undo" Command="{Binding UndoCommand}" />
-      <AppBarButton Icon="Redo" Label="Redo" Command="{Binding RedoCommand}" />
+      <AppBarButton Icon="Document" Label="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
+      <AppBarButton Icon="Undo" Label="{Binding UndoLabel}" Command="{Binding UndoCommand}" />
+      <AppBarButton Icon="Redo" Label="{Binding RedoLabel}" Command="{Binding RedoCommand}" />
     </CommandBar>
 
-    <NavigationView x:Name="Navigation" Grid.Row="1" IsBackButtonVisible="Collapsed"
+    <NavigationView x:Name="Navigation" Grid.Row="1" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
                     PaneDisplayMode="LeftCompact" SelectionChanged="Navigation_SelectionChanged">
       <NavigationView.MenuItems>
-        <NavigationViewItem Content="Calendar" Icon="Calendar" Tag="calendar" />
-        <NavigationViewItem Content="Stripboard" Icon="List" Tag="stripboard" />
-        <NavigationViewItem Content="Production" Icon="Contact" Tag="production" />
-        <NavigationViewItem Content="Reports" Icon="Document" Tag="reports" />
+        <NavigationViewItem Content="{Binding CalendarLabel}" Icon="Calendar" Tag="calendar" />
+        <NavigationViewItem Content="{Binding StripboardLabel}" Icon="List" Tag="stripboard" />
+        <NavigationViewItem Content="{Binding ProductionLabel}" Icon="Contact" Tag="production" />
+        <NavigationViewItem Content="{Binding ReportsLabel}" Icon="Document" Tag="reports" />
+        <NavigationViewItem Content="{Binding SettingsLabel}" Icon="Setting" Tag="settings" />
       </NavigationView.MenuItems>
 
       <Grid Padding="20">
@@ -140,14 +141,28 @@
             <StackPanel Spacing="16" MaxWidth="520" HorizontalAlignment="Left">
               <TextBlock Text="Export report" Style="{ThemeResource TitleTextBlockStyle}" />
               <ComboBox ItemsSource="{Binding ReportKinds}" SelectedItem="{Binding SelectedReportKind, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-              <Button Content="Export PDF" Command="{Binding ExportReportCommand}" HorizontalAlignment="Left" />
+              <Button Content="{Binding ExportLabel}" Command="{Binding ExportReportCommand}" HorizontalAlignment="Left" />
+            </StackPanel>
+          </PivotItem>
+
+          <PivotItem>
+            <StackPanel Spacing="16" MaxWidth="520" HorizontalAlignment="Left">
+              <TextBlock Text="{Binding SettingsLabel}" Style="{ThemeResource TitleTextBlockStyle}" />
+              <TextBlock Text="{Binding LanguageLabel}" />
+              <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+              <TextBlock Text="{Binding ThemeLabel}" />
+              <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+              <TextBlock Text="{Binding ColorModeLabel}" />
+              <ComboBox ItemsSource="{Binding ColorModes}" SelectedItem="{Binding SelectedColorMode, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+              <Border Height="8" CornerRadius="4" Background="{Binding AccentBrush}" />
             </StackPanel>
           </PivotItem>
         </Pivot>
       </Grid>
     </NavigationView>
 
-    <Border Grid.Row="2" Padding="12,6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+    <Border Grid.Row="2" Padding="12,6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="4,0,0,0">
       <TextBlock Text="{Binding Status}" />
     </Border>
   </Grid>

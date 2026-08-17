@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\CineSched.Core\CineSched.Core.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="TestAssets\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

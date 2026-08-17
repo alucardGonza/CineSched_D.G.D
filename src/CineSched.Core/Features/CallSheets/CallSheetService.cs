@@ -96,6 +96,45 @@ public sealed class CallSheetService(ProjectService projects)
             .ToList();
     }
 
+    public IReadOnlyList<CastCallEntry> GetResolvedCastEntries(Guid dayId)
+    {
+        var document = projects.Snapshot();
+        var day = document.ShootDays.FirstOrDefault(candidate => candidate.Id == dayId);
+        if (day is null) return [];
+        var roster = document.ProductionInfo?.CastList ?? [];
+        return day.CallSheet.CastCallEntries.Select(entry =>
+        {
+            var member = roster.FirstOrDefault(candidate => string.Equals(
+                candidate.CharacterName.Trim(), entry.CharacterName.Trim(), StringComparison.OrdinalIgnoreCase));
+            return new CastCallEntry
+            {
+                Id = entry.Id,
+                CharacterName = member?.CharacterName ?? entry.CharacterName,
+                ActorName = member?.ActorName ?? entry.ActorName,
+                SceneNumbers = entry.SceneNumbers,
+                Ecdt = entry.Ecdt,
+                PickupTime = entry.PickupTime,
+                HmuWardrobeTime = entry.HmuWardrobeTime,
+                OnSetTime = entry.OnSetTime,
+                WrapTime = entry.WrapTime,
+                LocationIndex = entry.LocationIndex
+            };
+        }).ToList();
+    }
+
+    public IReadOnlyList<Location> GetResolvedLocations(Guid dayId)
+    {
+        var document = projects.Snapshot();
+        var day = document.ShootDays.FirstOrDefault(candidate => candidate.Id == dayId);
+        if (day is null) return [];
+        var roster = document.ProductionInfo?.LocationRoster ?? [];
+        return day.CallSheet.Locations.Select(location =>
+        {
+            var current = roster.FirstOrDefault(candidate => candidate.Id == location.Id);
+            return current ?? location;
+        }).ToList();
+    }
+
     public bool HasData(Guid dayId) =>
         projects.Snapshot().ShootDays.FirstOrDefault(day => day.Id == dayId)?.CallSheet.HasData == true;
 }

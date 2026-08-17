@@ -7,6 +7,8 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         DataContext = viewModel;
         Navigation.SelectedItem = Navigation.MenuItems[0];
+        ApplySettings(viewModel.SelectedColorMode);
+        viewModel.SettingsChanged += (_, settings) => ApplySettings(settings.ColorMode);
         Loaded += (_, _) =>
         {
             if (XamlRoot is { } root) dialogs.Attach(root);
@@ -22,9 +24,17 @@ public sealed partial class MainPage : Page
             MenuDefinitions.Stripboard => 1,
             MenuDefinitions.Production => 2,
             MenuDefinitions.Reports => 3,
+            MenuDefinitions.Settings => 4,
             _ => 0
         };
     }
+
+    private void ApplySettings(ColorMode colorMode) => RequestedTheme = colorMode switch
+    {
+        ColorMode.Light => ElementTheme.Light,
+        ColorMode.Dark => ElementTheme.Dark,
+        _ => ElementTheme.Default
+    };
 
     private void Boneyard_DragItemsStarting(object sender, DragItemsStartingEventArgs args)
     {

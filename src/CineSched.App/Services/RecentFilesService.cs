@@ -19,4 +19,27 @@ public sealed class RecentFilesService(PreferencesService preferences)
         var recent = Get().Where(value => !string.Equals(value, identity, StringComparison.OrdinalIgnoreCase)).ToArray();
         await preferences.SetAsync(Key, recent, cancellationToken);
     }
+
+    public async ValueTask<Result<StorageFile>> ResolveAsync(
+        string identity,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(identity) || !Path.IsPathRooted(identity))
+            {
+                await RemoveAsync(identity, cancellationToken);
+                return Result<StorageFile>.Failure("recent.stale", "The recent file no longer has an accessible path.");
+            }
+
+            var file = await StorageFile.GetFileFromPathAsync(identity);
+            return Result<StorageFile>.Success(file);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            await RemoveAsync(identity, cancellationToken);
+            return Result<StorageFile>.Failure("recent.stale", exception.Message);
+        }
+    }
 }

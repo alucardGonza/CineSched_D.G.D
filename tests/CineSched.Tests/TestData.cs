@@ -2,6 +2,9 @@ namespace CineSched.Tests;
 
 internal static class TestData
 {
+    public static string Asset(params string[] segments) =>
+        Path.Combine([AppContext.BaseDirectory, "TestAssets", .. segments]);
+
     public static ProjectService Project(DateTimeOffset? start = null, int days = 3)
     {
         var projects = new ProjectService();

@@ -14,8 +14,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly ReportService _reports;
     private readonly FileDialogService _dialogs;
     private readonly DialogService _messages;
-    private readonly RecentFilesService _recentFiles;
-    private StorageFile? _projectFile;
+    private readonly AppLifecycleService _lifecycle;
+    private readonly SettingsService _settings;
+    private readonly PreferencesService _preferences;
     private ShootDay? _selectedDay;
     private Scene? _selectedBoneyardScene;
     private string _projectTitle = string.Empty;
@@ -31,7 +32,9 @@ public sealed class MainViewModel : ObservableObject
         ReportService reports,
         FileDialogService dialogs,
         DialogService messages,
-        RecentFilesService recentFiles,
+        AppLifecycleService lifecycle,
+        SettingsService settings,
+        PreferencesService preferences,
         AutosaveService autosave)
     {
         _projects = projects;
@@ -41,7 +44,10 @@ public sealed class MainViewModel : ObservableObject
         _reports = reports;
         _dialogs = dialogs;
         _messages = messages;
-        _recentFiles = recentFiles;
+        _lifecycle = lifecycle;
+        _settings = settings;
+        _preferences = preferences;
+        _settings.Update(_preferences.Get("app-settings", new AppSettings()));
         _projects.Changed += (_, _) => Refresh();
         autosave.Start();
 
@@ -62,6 +68,11 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<Scene> Boneyard { get; } = [];
     public ObservableCollection<Scene> SelectedDayScenes { get; } = [];
     public IReadOnlyList<ReportKind> ReportKinds { get; } = Enum.GetValues<ReportKind>();
+    public IReadOnlyList<AppLanguage> Languages { get; } = Enum.GetValues<AppLanguage>();
+    public IReadOnlyList<CineSchedAppTheme> Themes { get; } = Enum.GetValues<CineSchedAppTheme>();
+    public IReadOnlyList<ColorMode> ColorModes { get; } = Enum.GetValues<ColorMode>();
+
+    public event EventHandler<AppSettings>? SettingsChanged;
 
     public IAsyncRelayCommand NewProjectCommand { get; }
     public IAsyncRelayCommand OpenProjectCommand { get; }
@@ -130,6 +141,49 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public AppLanguage SelectedLanguage
+    {
+        get => _settings.Current.Language;
+        set => ChangeSettings(_settings.Current with { Language = value });
+    }
+
+    public CineSchedAppTheme SelectedTheme
+    {
+        get => _settings.Current.Theme;
+        set => ChangeSettings(_settings.Current with { Theme = value });
+    }
+
+    public ColorMode SelectedColorMode
+    {
+        get => _settings.Current.ColorMode;
+        set => ChangeSettings(_settings.Current with { ColorMode = value });
+    }
+
+    public Brush AccentBrush => new SolidColorBrush(_settings.Current.Theme switch
+    {
+        CineSchedAppTheme.Green => Windows.UI.Color.FromArgb(255, 22, 163, 74),
+        CineSchedAppTheme.Yellow => Windows.UI.Color.FromArgb(255, 202, 138, 4),
+        CineSchedAppTheme.System => (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"],
+        _ => Windows.UI.Color.FromArgb(255, 37, 99, 235)
+    });
+
+    public string CalendarLabel => _settings.GetText("nav.calendar");
+    public string StripboardLabel => _settings.GetText("nav.stripboard");
+    public string ProductionLabel => _settings.GetText("nav.production");
+    public string ReportsLabel => _settings.GetText("nav.reports");
+    public string SettingsLabel => _settings.GetText("nav.settings");
+    public string NewLabel => _settings.GetText("project.new");
+    public string OpenLabel => _settings.GetText("project.open");
+    public string SaveLabel => _settings.GetText("project.save");
+    public string SaveAsLabel => _settings.GetText("project.saveAs");
+    public string ImportLabel => _settings.GetText("project.import");
+    public string UndoLabel => _settings.GetText("project.undo");
+    public string RedoLabel => _settings.GetText("project.redo");
+    public string LanguageLabel => _settings.GetText("settings.language");
+    public string ThemeLabel => _settings.GetText("settings.theme");
+    public string ColorModeLabel => _settings.GetText("settings.colorMode");
+    public string ExportLabel => _settings.GetText("reports.export");
+
     public void MoveScenesToDay(IReadOnlyList<Guid> sceneIds, ShootDay target)
     {
         if (sceneIds.Count == 0) return;
@@ -144,8 +198,7 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        _projectFile = null;
-        _projects.NewProject(DateTimeOffset.Now);
+        _lifecycle.StartNewProject(DateTimeOffset.Now);
         Status = "New project created";
     }
 
@@ -157,51 +210,30 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        var file = await _dialogs.PickProjectToOpenAsync();
-        if (file is null) return;
-        await using var stream = await file.OpenStreamForReadAsync();
-        var result = await _projects.OpenAsync(stream);
-        if (result.IsSuccess)
+        var result = await _lifecycle.OpenFromPickerAsync();
+        if (result.IsSuccess && result.Value)
         {
-            _projectFile = file;
-            await _recentFiles.AddAsync(file);
-            Status = $"Opened {file.Name}";
+            Status = $"Opened {_lifecycle.AssociatedFile?.Name}";
         }
-        else Status = result.Error!.Message;
+        else if (!result.IsSuccess) Status = result.Error!.Message;
     }
 
     private async Task SaveProjectAsync()
     {
-        if (_projectFile is null)
-        {
-            await SaveAsProjectAsync();
-            return;
-        }
-
-        await SaveToAsync(_projectFile);
+        var result = await _lifecycle.SaveAsync();
+        if (result.IsSuccess && result.Value)
+            Status = $"Saved {_lifecycle.AssociatedFile?.Name}";
+        else if (!result.IsSuccess)
+            Status = result.Error!.Message;
     }
 
     private async Task SaveAsProjectAsync()
     {
-        var file = await _dialogs.PickProjectToSaveAsync(SafeName(ProjectTitle));
-        if (file is null) return;
-        if (await SaveToAsync(file)) _projectFile = file;
-    }
-
-    private async Task<bool> SaveToAsync(StorageFile file)
-    {
-        await using var stream = await file.OpenStreamForWriteAsync();
-        stream.SetLength(0);
-        var result = await _projects.SaveAsync(stream);
-        if (result.IsSuccess)
-        {
-            await _recentFiles.AddAsync(file);
-            Status = $"Saved {file.Name}";
-            return true;
-        }
-
-        Status = result.Error!.Message;
-        return false;
+        var result = await _lifecycle.SaveAsAsync();
+        if (result.IsSuccess && result.Value)
+            Status = $"Saved {_lifecycle.AssociatedFile?.Name}";
+        else if (!result.IsSuccess)
+            Status = result.Error!.Message;
     }
 
     private async Task ImportScriptAsync()
@@ -253,7 +285,8 @@ public sealed class MainViewModel : ObservableObject
         if (file is null) return;
         await using var stream = await file.OpenStreamForWriteAsync();
         stream.SetLength(0);
-        var request = new ReportRequest(_projects.GetSnapshot().Document, ReportLanguage.English, ShootDay: SelectedDay);
+        var language = _settings.Current.Language == AppLanguage.Spanish ? ReportLanguage.Spanish : ReportLanguage.English;
+        var request = new ReportRequest(_projects.GetSnapshot().Document, language, _settings.Current.IncludeHoldDays, SelectedDay);
         var result = await _reports.GenerateAsync(SelectedReportKind, request, stream);
         Status = result.IsSuccess ? $"Exported {file.Name}" : result.Error!.Message;
     }
@@ -289,6 +322,26 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private void SetStatus<T>(Result<T> result) => Status = result.IsSuccess ? "Done" : result.Error!.Message;
+
+    private void ChangeSettings(AppSettings settings)
+    {
+        if (settings == _settings.Current) return;
+        _settings.Update(settings);
+        _ = _preferences.SetAsync("app-settings", settings);
+        OnPropertyChanged(nameof(SelectedLanguage));
+        OnPropertyChanged(nameof(SelectedTheme));
+        OnPropertyChanged(nameof(SelectedColorMode));
+        OnPropertyChanged(nameof(AccentBrush));
+        foreach (var property in new[]
+                 {
+                     nameof(CalendarLabel), nameof(StripboardLabel), nameof(ProductionLabel), nameof(ReportsLabel),
+                     nameof(SettingsLabel), nameof(NewLabel), nameof(OpenLabel), nameof(SaveLabel), nameof(SaveAsLabel),
+                     nameof(ImportLabel), nameof(UndoLabel), nameof(RedoLabel), nameof(LanguageLabel), nameof(ThemeLabel),
+                     nameof(ColorModeLabel), nameof(ExportLabel)
+                 })
+            OnPropertyChanged(property);
+        SettingsChanged?.Invoke(this, settings);
+    }
 
     private static string SafeName(string value)
     {

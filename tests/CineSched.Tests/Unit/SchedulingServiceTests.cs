@@ -73,6 +73,41 @@ public sealed class SchedulingServiceTests
     }
 
     [Fact]
+    public void ChangeDateRangeWithoutShift_PreservesAbsoluteDatesAndReturnsExcludedScenesToBoneyard()
+    {
+        var projects = TestData.Project(days: 4);
+        projects.Update(document =>
+        {
+            document.ShootDays[1].Scenes.Add(TestData.Scene("1"));
+            document.ShootDays[3].Scenes.Add(TestData.Scene("2"));
+        });
+        var before = projects.GetSnapshot().Document;
+        var keptDate = before.ShootDays[1].Date;
+
+        new SchedulingService(projects).ChangeDateRange(new(
+            before.ShootDays[1].Date, before.ShootDays[2].Date, ShiftExisting: false));
+        var after = projects.GetSnapshot().Document;
+
+        Assert.Contains(after.ShootDays, day => day.Date == keptDate && day.Scenes.Any(scene => scene.SceneNumber == "1"));
+        Assert.Contains(after.AllScenes, scene => scene.SceneNumber == "2");
+    }
+
+    [Fact]
+    public void MoveGroup_PreservesRelativeDocumentOrderAndMovesExactlyOnce()
+    {
+        var projects = TestData.Project();
+        var scenes = new[] { TestData.Scene("1"), TestData.Scene("2"), TestData.Scene("3") };
+        projects.Update(document => document.AllScenes.AddRange(scenes));
+        var day = projects.GetSnapshot().Document.ShootDays[0];
+
+        new SchedulingService(projects).MoveScenes(new([scenes[2].Id, scenes[0].Id], null, day.Id, 0));
+        var result = projects.GetSnapshot().Document;
+
+        Assert.Equal([scenes[0].Id, scenes[2].Id], result.ShootDays[0].Scenes.Select(scene => scene.Id));
+        Assert.Equal(3, result.AllScenes.Count + result.ShootDays.SelectMany(value => value.Scenes).Count());
+    }
+
+    [Fact]
     public void SetBlackout_AppliesOnlyMatchingWeekday()
     {
         var projects = TestData.Project(days: 15);
@@ -103,5 +138,20 @@ public sealed class SchedulingServiceTests
         Assert.True(service.Undo().IsSuccess);
         service.SetBlackout(new(projects.GetSnapshot().Document.ShootDays[0].Id, true));
         Assert.False(service.Redo().IsSuccess);
+    }
+
+    [Fact]
+    public void UndoHistory_KeepsOnlyThirtyStructuralSnapshots()
+    {
+        var projects = TestData.Project();
+        var service = new SchedulingService(projects);
+        var dayId = projects.GetSnapshot().Document.ShootDays[0].Id;
+        for (var index = 0; index < 35; index++)
+            service.SetBlackout(new(dayId, index % 2 == 0));
+
+        var successfulUndos = 0;
+        while (service.Undo().IsSuccess) successfulUndos++;
+
+        Assert.Equal(30, successfulUndos);
     }
 }

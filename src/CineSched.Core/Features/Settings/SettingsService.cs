@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace CineSched.Core.Features.Settings;
 
 public sealed class SettingsService
@@ -26,6 +28,12 @@ public sealed class SettingsService
         return $"[{key}]";
     }
 
+    public CultureInfo Culture => _current.Language == AppLanguage.Spanish
+        ? CultureInfo.GetCultureInfo("es-ES")
+        : CultureInfo.GetCultureInfo("en-US");
+
+    public string FormatDate(DateTimeOffset value, string format = "D") => value.ToString(format, Culture);
+
     private static readonly IReadOnlyDictionary<string, (string En, string Es)> Translations =
         new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
         {
@@ -36,6 +44,15 @@ public sealed class SettingsService
             ["nav.reports"] = ("Reports", "Reportes"),
             ["project.new"] = ("New", "Nuevo"),
             ["project.open"] = ("Open", "Abrir"),
-            ["project.save"] = ("Save", "Guardar")
+            ["project.save"] = ("Save", "Guardar"),
+            ["project.saveAs"] = ("Save As", "Guardar como"),
+            ["project.import"] = ("Import Script", "Importar guion"),
+            ["project.undo"] = ("Undo", "Deshacer"),
+            ["project.redo"] = ("Redo", "Rehacer"),
+            ["nav.settings"] = ("Settings", "Ajustes"),
+            ["settings.language"] = ("Language", "Idioma"),
+            ["settings.theme"] = ("Theme", "Tema"),
+            ["settings.colorMode"] = ("Color mode", "Modo de color"),
+            ["reports.export"] = ("Export PDF", "Exportar PDF")
         };
 }

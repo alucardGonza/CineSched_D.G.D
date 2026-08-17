@@ -32,6 +32,7 @@ internal static class ServiceRegistration
         services.AddSingleton<PreferencesService>();
         services.AddSingleton<RecentFilesService>();
         services.AddSingleton<AutosaveService>();
+        services.AddSingleton<AppLifecycleService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainPage>();
         return services;

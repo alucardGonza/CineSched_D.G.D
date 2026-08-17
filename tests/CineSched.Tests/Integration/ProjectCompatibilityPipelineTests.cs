@@ -4,15 +4,19 @@ namespace CineSched.Tests.Integration;
 
 public sealed class ProjectCompatibilityPipelineTests
 {
-    [Fact]
-    public async Task SwiftFixture_OpenModifySaveReload_PreservesSharedData()
+    [Theory]
+    [InlineData("current-v4.5.0.cinesched")]
+    [InlineData("legacy-top-level.cinesched")]
+    [InlineData("legacy-cast-string.cinesched")]
+    [InlineData("missing-optionals.cinesched")]
+    public async Task SwiftFixtures_OpenModifySaveReload_PreserveIdsDatesAndUnmodifiedFields(string fixtureName)
     {
-        const string fixture = """
-        {"allScenes":[{"id":"590f6957-c092-4708-9707-1cc9cb810122","title":"INT. CASA - DAY","sceneNumber":"1","duration":8,"estimatedTime":30,"dayNightType":"DAY","cast":["ANA"],"props":["KEY"],"sfx":["RAIN"],"vfx":["SKY"]}],"shootDays":[],"projectTitle":"Feature","createdDate":"2026-08-01T10:00:00-0400","isShiftModeEnabled":false,"productionInfo":{}}
-        """;
         var first = new ProjectService();
-        Assert.True((await first.OpenAsync(new MemoryStream(Encoding.UTF8.GetBytes(fixture)))).IsSuccess);
+        await using var source = File.OpenRead(TestData.Asset("Projects", fixtureName));
+        Assert.True((await first.OpenAsync(source)).IsSuccess);
         var scene = first.GetSnapshot().Document.AllScenes.Single();
+        var originalId = scene.Id;
+        var originalDate = first.GetSnapshot().Document.ShootDays.FirstOrDefault()?.Date;
         scene.Wardrobe.Add("COAT");
         new SceneService(first).EditScene(scene);
         using var saved = new MemoryStream();
@@ -24,9 +28,15 @@ public sealed class ProjectCompatibilityPipelineTests
 
         Assert.True(reopened.IsSuccess, reopened.Error?.Message);
         var loaded = reopened.Value!.AllScenes.Single();
-        Assert.Equal(["KEY"], loaded.Props);
-        Assert.Equal(["COAT"], loaded.Wardrobe);
-        Assert.Equal(["RAIN"], loaded.Sfx);
-        Assert.Equal(["SKY"], loaded.Vfx);
+        Assert.Equal(originalId, loaded.Id);
+        Assert.Contains("COAT", loaded.Wardrobe);
+        Assert.Equal(originalDate, reopened.Value.ShootDays.FirstOrDefault()?.Date);
+        if (fixtureName == "current-v4.5.0.cinesched")
+        {
+            Assert.Equal(["KEY"], loaded.Props);
+            Assert.Equal(["RAIN"], loaded.Sfx);
+            Assert.Equal(["SKY REPLACEMENT"], loaded.Vfx);
+            Assert.NotNull(reopened.Value.ProductionInfo!.ScheduleLock);
+        }
     }
 }

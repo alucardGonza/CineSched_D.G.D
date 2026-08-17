@@ -92,7 +92,7 @@ flowchart TB
 
 | Proyecto | Dependencias directas permitidas |
 |---|---|
-| `CineSched.Core` | BCL de .NET 10 y PDFsharp 6.2.4 |
+| `CineSched.Core` | BCL de .NET 10, PDFsharp 6.2.4 y `FontLibrary.libRoboto` 1.0.0 únicamente como fuente embebida |
 | `CineSched.App` | Uno SDK 6.6.42, CommunityToolkit.Mvvm 8.4.2 y `CineSched.Core` |
 | `CineSched.Tests` | xUnit, test SDK y `CineSched.Core` |
 

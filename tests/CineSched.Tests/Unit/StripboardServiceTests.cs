@@ -40,4 +40,23 @@ public sealed class StripboardServiceTests
         Assert.True(meal.Value.IsBanner);
         Assert.True(meal.Value.IsAutoMeal);
     }
+
+    [Fact]
+    public void BannerAndCalendarEvent_ParticipateInTimelineButNotScenePageTotalsOrBoneyard()
+    {
+        var projects = TestData.Project();
+        var dayId = projects.GetSnapshot().Document.ShootDays[0].Id;
+        var service = new StripboardService(projects);
+        service.AddBanner(dayId, BannerType.Notice, "Notice", "Note", 20, "#123456");
+        service.AddCalendarEvent(dayId, "Meeting", "10:00 AM", "#654321", 10);
+
+        var day = projects.GetSnapshot().Document.ShootDays[0];
+        var timeline = service.CalculateTimeline(dayId);
+
+        Assert.Equal(2, timeline.Value!.Items.Count);
+        Assert.Equal(0, day.TotalDuration);
+        Assert.Empty(projects.GetSnapshot().Document.AllScenes);
+        Assert.Contains(day.Scenes, scene => scene.IsBanner);
+        Assert.Contains(day.Scenes, scene => scene.IsCalendarEvent);
+    }
 }

@@ -53,4 +53,81 @@ public sealed class SceneServiceTests
 
         Assert.Equal(["2", "12", "12A", "12B", "20"], ordered.Select(scene => scene.SceneNumber));
     }
+
+    [Fact]
+    public void EditScene_PreservesIdentityPositionAndIndependentBreakdownCategories()
+    {
+        var projects = TestData.Project();
+        var first = TestData.Scene("1");
+        var edited = TestData.Scene("2");
+        edited.Props.Add("KEY");
+        edited.Wardrobe.Add("COAT");
+        edited.Sfx.Add("RAIN");
+        edited.Vfx.Add("SKY");
+        projects.Update(document => document.ShootDays[0].Scenes.AddRange([first, edited, TestData.Scene("3")]));
+        var service = new SceneService(projects);
+        var snapshot = projects.GetSnapshot().Document.ShootDays[0].Scenes[1];
+        snapshot.Props = ["MAP"];
+
+        var result = service.EditScene(snapshot);
+        var scenes = projects.GetSnapshot().Document.ShootDays[0].Scenes;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(edited.Id, scenes[1].Id);
+        Assert.Equal(["MAP"], scenes[1].Props);
+        Assert.Equal(["COAT"], scenes[1].Wardrobe);
+        Assert.Equal(["RAIN"], scenes[1].Sfx);
+        Assert.Equal(["SKY"], scenes[1].Vfx);
+    }
+
+    [Fact]
+    public void DeleteScene_RemovesAScheduledSceneEverywhere()
+    {
+        var projects = TestData.Project();
+        var scene = TestData.Scene("1");
+        projects.Update(document => document.ShootDays[0].Scenes.Add(scene));
+
+        var result = new SceneService(projects).DeleteScene(scene.Id);
+        var document = projects.GetSnapshot().Document;
+
+        Assert.True(result.IsSuccess);
+        Assert.DoesNotContain(document.AllScenes, candidate => candidate.Id == scene.Id);
+        Assert.DoesNotContain(document.ShootDays.SelectMany(day => day.Scenes), candidate => candidate.Id == scene.Id);
+    }
+
+    [Fact]
+    public void InvalidCreate_DoesNotModifyProject()
+    {
+        var projects = TestData.Project();
+
+        var result = new SceneService(projects).CreateScene(new SceneInput("Scene", Duration: "invalid", EstimatedTime: "15"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(projects.GetSnapshot().Document.AllScenes);
+    }
+
+    [Fact]
+    public void SortAndSearch_AreQueriesAndDoNotReorderPersistence()
+    {
+        var projects = TestData.Project();
+        var scenes = new[]
+        {
+            TestData.Scene("2", "EXT. ZOO - NIGHT", "BOB"),
+            TestData.Scene("1", "INT. HOUSE - DAY", "ANA")
+        };
+        scenes[1].Summary = "Hidden clue";
+        projects.Update(document =>
+        {
+            document.AllScenes.AddRange(scenes);
+            document.ShootDays[0].Scenes.Add(TestData.Scene("3", "INT. LAB - DAY", "CLARA"));
+        });
+        var service = new SceneService(projects);
+        var storedOrder = projects.GetSnapshot().Document.AllScenes.Select(scene => scene.Id).ToArray();
+
+        foreach (var sort in Enum.GetValues<BoneyardSort>()) Assert.Equal(2, service.SortBoneyard(sort).Count);
+        Assert.Equal(storedOrder, projects.GetSnapshot().Document.AllScenes.Select(scene => scene.Id));
+        Assert.Single(service.SearchScenes("clue"));
+        Assert.Single(service.SearchScenes("clara"));
+        Assert.Single(service.SearchScenes("lab"));
+    }
 }

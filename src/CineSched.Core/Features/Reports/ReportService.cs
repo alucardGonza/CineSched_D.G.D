@@ -3,6 +3,7 @@ using CineSched.Core.Features.Production;
 using CineSched.Core.Features.Scenes;
 using CineSched.Core.Features.Scheduling;
 using FontLibrary.libRoboto;
+using System.Globalization;
 using System.Resources;
 using PdfSharp;
 using PdfSharp.Drawing;
@@ -121,13 +122,15 @@ public sealed class ReportService
         var rows = request.Project.ShootDays.OrderBy(day => day.Date)
             .Select(day => new[]
             {
-                day.Date.ToString("yyyy-MM-dd"),
+                day.Date.ToString("d", ReportCulture(request)),
                 day.IsBlackout ? Text(request, "Blackout", "No disponible") : string.Empty,
                 string.Join(", ", day.Scenes.Where(IsNormal).Select(scene => scene.SceneNumber)),
                 $"{day.TotalDuration / 8} {day.TotalDuration % 8}/8",
                 $"{day.TotalEstimatedTime} min"
             }).ToList();
-        RenderTable(document, request.Project.ProjectTitle, ["Date", "Status", "Scenes", "Pages", "Time"], rows, landscape: true);
+        RenderTable(document, request.Project.ProjectTitle,
+            [Text(request, "Date", "Fecha"), Text(request, "Status", "Estado"), Text(request, "Scenes", "Escenas"), Text(request, "Pages", "Páginas"), Text(request, "Time", "Tiempo")],
+            rows, landscape: true);
     }
 
     private static void RenderStripboard(PdfDocument document, ReportRequest request, bool includeTimes)
@@ -143,13 +146,15 @@ public sealed class ReportService
                 var start = cursor;
                 cursor = cursor.AddMinutes(Math.Max(0, scene.EstimatedTime));
                 rows.Add(includeTimes
-                    ? [day.Date.ToString("MMM dd"), start.ToString("hh:mm tt"), scene.DisplayTitle, FormatPages(scene), $"{scene.EstimatedTime} min"]
-                    : [day.Date.ToString("MMM dd"), scene.IsBanner ? "BANNER" : scene.DayNightType.ToString().ToUpperInvariant(), scene.DisplayTitle, string.Join(", ", scene.Cast), FormatPages(scene)]);
+                    ? [day.Date.ToString("MMM dd", ReportCulture(request)), start.ToString("t", ReportCulture(request)), scene.DisplayTitle, FormatPages(scene), $"{scene.EstimatedTime} min"]
+                    : [day.Date.ToString("MMM dd", ReportCulture(request)), scene.IsBanner ? "BANNER" : scene.DayNightType.ToString().ToUpperInvariant(), scene.DisplayTitle, string.Join(", ", scene.Cast), FormatPages(scene)]);
             }
         }
 
-        var title = includeTimes ? "One-Line Shooting Schedule" : "Strip Schedule";
-        var headers = includeTimes ? new[] { "Day", "Time", "Scene / Slugline", "Pages", "Duration" } : new[] { "Day", "Type", "Scene / Slugline", "Cast", "Pages" };
+        var title = includeTimes ? Text(request, "One-Line Shooting Schedule", "Plan de rodaje One-Line") : Text(request, "Strip Schedule", "Plan de tiras");
+        var headers = includeTimes
+            ? new[] { Text(request, "Day", "Día"), Text(request, "Time", "Hora"), Text(request, "Scene / Slugline", "Escena / Encabezado"), Text(request, "Pages", "Páginas"), Text(request, "Duration", "Duración") }
+            : new[] { Text(request, "Day", "Día"), Text(request, "Type", "Tipo"), Text(request, "Scene / Slugline", "Escena / Encabezado"), Text(request, "Cast", "Reparto"), Text(request, "Pages", "Páginas") };
         RenderTable(document, $"{request.Project.ProjectTitle} — {title}", headers, rows, landscape: true);
     }
 
@@ -166,15 +171,15 @@ public sealed class ReportService
             {
                 var dayChunk = days.Skip(dayStart).Take(maxDays).ToList();
                 var actorChunk = entries.Skip(actorStart).Take(maxActors).ToList();
-                var headers = new List<string> { "Cast" };
-                headers.AddRange(dayChunk.Select(day => day.Date.ToString("MM/dd") + (day.IsBlackout ? "*" : string.Empty)));
+                var headers = new List<string> { Text(request, "Cast", "Reparto") };
+                headers.AddRange(dayChunk.Select(day => day.Date.ToString("d", ReportCulture(request)) + (day.IsBlackout ? "*" : string.Empty)));
                 var rows = actorChunk.Select(entry =>
                 {
                     var cells = new List<string> { entry.Key };
                     cells.AddRange(entry.Value.Skip(dayStart).Take(dayChunk.Count));
                     return cells.ToArray();
                 }).ToList();
-                RenderTable(document, $"{request.Project.ProjectTitle} — Days Out of Days", headers.ToArray(), rows, landscape: true);
+                RenderTable(document, $"{request.Project.ProjectTitle} — {Text(request, "Days Out of Days", "Días de reparto")}", headers.ToArray(), rows, landscape: true);
             }
         }
     }
@@ -188,14 +193,14 @@ public sealed class ReportService
         {
             var page = CreatePage(document, landscape: false);
             using var graphics = XGraphics.FromPdfPage(page);
-            var y = DrawHeader(graphics, page, $"{request.Project.ProjectTitle} — Scene {scene.SceneNumber}", scene.Title);
+            var y = DrawHeader(graphics, page, $"{request.Project.ProjectTitle} — {Text(request, "Scene", "Escena")} {scene.SceneNumber}", scene.Title);
             var sections = new (string Label, IEnumerable<string> Values)[]
             {
-                ("Cast", scene.Cast), ("Extras", scene.Extras), ("Props", scene.Props),
-                ("Set Dressing", scene.SetDressing), ("Wardrobe", scene.Wardrobe),
-                ("Makeup / Hair", scene.MakeupHair), ("Vehicles", scene.Vehicles),
-                ("Special Equipment", scene.SpecialEquipment), ("Stunts", scene.Stunts),
-                ("SFX", scene.Sfx), ("VFX", scene.Vfx), ("Notes", [scene.BreakdownNotes])
+                (Text(request, "Cast", "Reparto"), scene.Cast), ("Extras", scene.Extras), (Text(request, "Props", "Utilería"), scene.Props),
+                (Text(request, "Set Dressing", "Ambientación"), scene.SetDressing), (Text(request, "Wardrobe", "Vestuario"), scene.Wardrobe),
+                (Text(request, "Makeup / Hair", "Maquillaje / Peinado"), scene.MakeupHair), (Text(request, "Vehicles", "Vehículos"), scene.Vehicles),
+                (Text(request, "Special Equipment", "Equipo especial"), scene.SpecialEquipment), (Text(request, "Stunts", "Dobles"), scene.Stunts),
+                ("SFX", scene.Sfx), ("VFX", scene.Vfx), (Text(request, "Notes", "Notas"), [scene.BreakdownNotes])
             };
             foreach (var section in sections)
             {
@@ -210,23 +215,34 @@ public sealed class ReportService
         if (day is null) return;
         var sheet = day.CallSheet;
         var production = request.Project.ProductionInfo ?? new ProductionInfo();
+        var resolvedCast = sheet.CastCallEntries.Select(entry =>
+        {
+            var member = production.CastList.FirstOrDefault(candidate => string.Equals(
+                candidate.CharacterName.Trim(), entry.CharacterName.Trim(), StringComparison.OrdinalIgnoreCase));
+            return (Entry: entry, Actor: member?.ActorName ?? entry.ActorName, Character: member?.CharacterName ?? entry.CharacterName);
+        }).ToList();
+        var resolvedLocations = sheet.Locations.Select(location =>
+            production.LocationRoster.FirstOrDefault(candidate => candidate.Id == location.Id) ?? location).ToList();
+        var selectedCrewIds = sheet.CrewIDOverride?.ToHashSet() ?? [];
+        var resolvedCrew = production.Crew.Where(member => selectedCrewIds.Contains(member.Id)).ToList();
         var page = CreatePage(document, landscape: false);
         using var graphics = XGraphics.FromPdfPage(page);
-        var y = DrawHeader(graphics, page, request.Project.ProjectTitle, $"{Text(request, "Call Sheet", "Hoja de llamado")} — {day.Date:dddd, MMMM d, yyyy}");
+        var y = DrawHeader(graphics, page, request.Project.ProjectTitle,
+            $"{Text(request, "Call Sheet", "Hoja de llamado")} — {day.Date.ToString("D", ReportCulture(request))}");
         var lines = new[]
         {
             $"{Text(request, "General Call", "Llamado general")}: {sheet.GeneralCallTime}",
-            $"Director: {production.DirectorName} {production.DirectorPhone}",
-            $"Producer: {production.ProducerName} {production.ProducerPhone}",
+            $"{Text(request, "Director", "Dirección")}: {production.DirectorName} {production.DirectorPhone}",
+            $"{Text(request, "Producer", "Producción")}: {production.ProducerName} {production.ProducerPhone}",
             $"1st AD: {production.AdName} {production.AdPhone}",
-            $"Ready: {sheet.ReadyToShootTime}  Lunch: {sheet.LunchTime}  Wrap: {sheet.WrapTime}",
-            $"Weather: {sheet.WeatherTemp} {sheet.WeatherCondition} {sheet.WeatherPrecipWind}",
+            $"{Text(request, "Ready", "Listos")}: {sheet.ReadyToShootTime}  {Text(request, "Lunch", "Comida")}: {sheet.LunchTime}  Wrap: {sheet.WrapTime}",
+            $"{Text(request, "Weather", "Clima")}: {sheet.WeatherTemp} {sheet.WeatherCondition} {sheet.WeatherPrecipWind}",
             $"Hospital: {sheet.NearestHospital}",
-            $"Locations: {string.Join("; ", sheet.Locations.Select(location => $"{location.Name} — {location.Address}"))}",
-            $"Scenes: {string.Join(", ", day.Scenes.Where(IsNormal).Select(scene => scene.DisplayTitle))}",
-            $"Cast: {string.Join("; ", sheet.CastCallEntries.Select(entry => $"{entry.ActorName} / {entry.CharacterName} / {entry.OnSetTime}"))}",
-            $"Crew: {string.Join("; ", sheet.CrewCallEntries.Select(entry => $"{entry.Role}: {entry.Name} {entry.CallTime}"))}",
-            $"Notes: {string.Join("; ", sheet.ProductionNotes.Append(sheet.Notes).Where(value => !string.IsNullOrWhiteSpace(value)))}"
+            $"{Text(request, "Locations", "Locaciones")}: {string.Join("; ", resolvedLocations.Select(location => $"{location.Name} — {location.Address}"))}",
+            $"{Text(request, "Scenes", "Escenas")}: {string.Join(", ", day.Scenes.Where(IsNormal).Select(scene => scene.DisplayTitle))}",
+            $"{Text(request, "Cast", "Reparto")}: {string.Join("; ", resolvedCast.Select(value => $"{value.Actor} / {value.Character} / {value.Entry.OnSetTime}"))}",
+            $"{Text(request, "Crew", "Equipo")}: {string.Join("; ", resolvedCrew.Select(member => $"{member.Role}: {member.Name}").Concat(sheet.CrewCallEntries.Select(entry => $"{entry.Role}: {entry.Name} {entry.CallTime}")))}",
+            $"{Text(request, "Notes", "Notas")}: {string.Join("; ", sheet.ProductionNotes.Append(sheet.Notes).Where(value => !string.IsNullOrWhiteSpace(value)))}"
         };
         foreach (var line in lines) DrawLine(graphics, page, ref y, line);
     }
@@ -327,6 +343,10 @@ public sealed class ReportService
 
     private static string Text(ReportRequest? request, string english, string spanish) =>
         request?.Language == ReportLanguage.Spanish ? spanish : english;
+
+    private static CultureInfo ReportCulture(ReportRequest request) => request.Language == ReportLanguage.Spanish
+        ? CultureInfo.GetCultureInfo("es-ES")
+        : CultureInfo.GetCultureInfo("en-US");
 
     private sealed class EmbeddedRobotoFontResolver : IFontResolver
     {

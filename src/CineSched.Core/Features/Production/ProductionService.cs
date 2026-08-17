@@ -49,6 +49,21 @@ public sealed class ProductionService(ProjectService projects)
         return Result<CrewMember>.Success(member);
     }
 
+    public Result<Location> UpdateLocation(Guid id, string name, string address)
+    {
+        var document = projects.Snapshot();
+        var location = document.ProductionInfo?.LocationRoster.FirstOrDefault(candidate => candidate.Id == id);
+        if (location is null)
+        {
+            return Result<Location>.Failure("production.location-not-found", "The location does not exist.");
+        }
+
+        location.Name = name.Trim();
+        location.Address = address.Trim();
+        projects.Apply(document, "production.location-updated", structural: false);
+        return Result<Location>.Success(location);
+    }
+
     public IReadOnlyList<Location> NormalizeRoster()
     {
         var document = projects.Snapshot();

@@ -113,20 +113,31 @@ public sealed class ProjectService
 
     public async ValueTask<Result<Unit>> SaveAsync(Stream destination, CancellationToken cancellationToken = default)
     {
-        var snapshot = Snapshot();
-        var result = await WriteAsync(snapshot, destination, cancellationToken).ConfigureAwait(false);
+        var snapshot = GetSnapshot();
+        var result = await WriteAsync(snapshot.Document, destination, cancellationToken).ConfigureAwait(false);
         if (!result.IsSuccess)
         {
             return result;
         }
 
+        MarkSaved(snapshot.Revision);
+        return result;
+    }
+
+    public bool MarkSaved(long revision)
+    {
         lock (_gate)
         {
+            if (Revision != revision)
+            {
+                return false;
+            }
+
             IsDirty = false;
         }
 
         RaiseChanged("project.saved");
-        return result;
+        return true;
     }
 
     public async ValueTask<Result<Unit>> WriteAsync(

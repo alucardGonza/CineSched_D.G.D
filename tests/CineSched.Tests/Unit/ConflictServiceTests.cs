@@ -39,4 +39,22 @@ public sealed class ConflictServiceTests
 
         Assert.Equal(2, duplicates["12A"].Count);
     }
+
+    [Fact]
+    public void BlackoutScan_ReportsScheduledNormalScenesWithoutBlockingMove()
+    {
+        var projects = TestData.Project();
+        var scene = TestData.Scene("1");
+        projects.Update(document => document.AllScenes.Add(scene));
+        var day = projects.GetSnapshot().Document.ShootDays[0];
+        var scheduling = new SchedulingService(projects);
+        scheduling.SetBlackout(new(day.Id, true));
+
+        var move = scheduling.MoveScenes(new([scene.Id], null, day.Id, 0));
+        var conflict = Assert.Single(new ConflictService(projects).ScanBlackouts());
+
+        Assert.True(move.IsSuccess);
+        Assert.Equal(scene.Id, conflict.SceneId);
+        Assert.True(conflict.IsBlackout);
+    }
 }

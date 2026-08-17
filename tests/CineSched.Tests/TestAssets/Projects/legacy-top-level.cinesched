@@ -1,0 +1,8 @@
+{
+  "allScenes": [
+    {"id":"10101010-1010-1010-1010-101010101010","title":"INT. LEGACY - DAY","duration":8,"estimatedTime":30,"dayNightType":"DAY","cast":["ANA"]}
+  ],
+  "shootDays": [
+    {"id":"20202020-2020-2020-2020-202020202020","date":808099200,"scenes":[],"callSheet":{},"isBlackout":false}
+  ]
+}
