@@ -37,7 +37,7 @@ Si una implementación contradice `SPEC.md`, la implementación es incorrecta. S
 2. Conservar todas las funciones documentadas en README y CHANGELOG.
 3. Abrir documentos creados por Swift y producir documentos que Swift pueda volver a abrir sin perder datos.
 4. Separar por completo la lógica de negocio de la interfaz mediante `CineSched.Core` y `CineSched.App`.
-5. Organizar Core por vertical slices, con casos de uso aislados y pruebas.
+5. Organizar Core por vertical slices: un `Models.cs` con todos los modelos de la feature y un único service con todas sus operaciones públicas.
 6. Producir los seis reportes PDF de forma vectorial y determinista en las tres plataformas.
 7. Generar artefactos autocontenidos mediante CI; AppImage y `tar.gz` serán las entregas Linux principales.
 
@@ -61,7 +61,7 @@ Si una implementación contradice `SPEC.md`, la implementación es incorrecta. S
 | JSON | `System.Text.Json` con convertidores propios de compatibilidad Swift |
 | XML/FDX | `System.Xml`/`System.Xml.Linq`, sin dependencia de Final Draft |
 | Highland | `System.IO.Compression.ZipArchive` |
-| Pruebas | xUnit sobre .NET 10 |
+| Pruebas | Un único proyecto `CineSched.Tests` con xUnit sobre .NET 10 |
 | Solución | `CineSched.slnx` con dos proyectos de producción |
 | CI | GitHub Actions en Windows, Ubuntu y macOS |
 
@@ -119,7 +119,8 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 **Trabajo**
 
 - Crear `CineSched.slnx`, `global.json`, configuración común y administración central de paquetes.
-- Crear `CineSched.Core`, `CineSched.App`, `CineSched.Core.Tests` y `CineSched.IntegrationTests`.
+- Crear `CineSched.Core`, `CineSched.App` y un único proyecto `CineSched.Tests`, dividido internamente en pruebas unitarias y de integración.
+- Crear en cada vertical slice de Core únicamente `Models.cs` y `<Feature>Service.cs` como estructura pública, sin handlers ni carpetas por operación.
 - Generar una shell Uno mínima con Skia Desktop y composición de dependencias.
 - Configurar restore, build y test en GitHub Actions para los tres sistemas operativos.
 
@@ -127,6 +128,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 
 - La solución restaura y compila sin warnings en los runners soportados.
 - Core no contiene referencias a Uno, WinUI ni APIs de plataforma.
+- Core no contiene capas Ports/Adapters ni clases handler por función.
 - La aplicación muestra una ventana vacía en Linux, Windows y macOS.
 
 ### Fase 2: dominio, parsers y compatibilidad JSON
@@ -135,8 +137,8 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 
 - Portar entidades, enums, valores por defecto y propiedades derivadas.
 - Implementar parsing de octavos, duración, números de escena, INT/EXT y decorado.
-- Implementar `SwiftCompatibleProjectCodec` y convertidores de fechas, enums y campos legacy.
-- Crear `ProjectSession`, dirty state y undo/redo de 30 snapshots.
+- Implementar dentro de `ProjectService` la serialización compatible, convertidores de fechas, enums y campos legacy.
+- Hacer que `ProjectService` mantenga documento actual, dirty state, revisión y snapshots; `SchedulingService` expondrá undo/redo de 30 niveles.
 - Implementar New, Open, Save y Save As sobre streams.
 
 **Gate**
@@ -149,10 +151,10 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 
 **Trabajo**
 
-- Implementar CRUD, duplicado, búsqueda, Boneyard y los cinco ordenamientos.
-- Implementar calendario lunes-domingo, rango, shift schedule y estadísticas.
-- Implementar selección individual, Cmd/Ctrl, Shift, movimiento, reordenamiento, Send to Day, Remove from Day y swap de días.
-- Implementar blackout days, días recurrentes y undo/redo estructural.
+- Implementar en `SceneService` CRUD, duplicado, parsing, búsqueda, Boneyard y los cinco ordenamientos.
+- Implementar en `SchedulingService` calendario lunes-domingo, rango, shift schedule y estadísticas.
+- Concentrar en `SchedulingService` selección estructural, MoveScenes, ReorderScenes, MoveWholeDay, Send to Day, Remove from Day y SetBlackout.
+- Mantener Undo y Redo como métodos del mismo `SchedulingService`, con historial de 30 snapshots.
 
 **Gate**
 
@@ -210,7 +212,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 **Trabajo**
 
 - Construir shell, MenuBar, CommandBar, sidebar, Boneyard y selector Calendar/Stripboard.
-- Conectar view models delgados a handlers Core.
+- Conectar view models delgados al único service concreto de cada vertical slice.
 - Implementar diálogos de escena, producción, call sheet, conflictos, lock y breakdown.
 - Implementar drag-and-drop, tooltips, búsqueda, multi-selección y scrolling.
 - Portar traducciones, temas, modo claro/oscuro, atajos y animaciones de estado.
@@ -241,7 +243,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 ## 9. Estrategia de pruebas
 
 - Core tendrá la mayoría de la cobertura: reglas de negocio, parsers, scheduling, timeline, conflictos, lock, importadores y layout de reportes.
-- Habrá solo cuatro suites de integración de alto valor, descritas en `SPEC.md`: compatibilidad de proyecto, importación, workflow completo y reportes.
+- Dentro de `CineSched.Tests` habrá solo cuatro clases de integración de alto valor, descritas en `SPEC.md`: compatibilidad de proyecto, importación, workflow completo y reportes.
 - Los detalles visuales específicos de Skia se validarán mediante checklist manual y screenshots de referencia, no con una gran suite frágil de UI tests.
 - Cada bug de compatibilidad o lógica descubierto durante la migración deberá reproducirse primero con una prueba Core o de integración.
 
@@ -264,7 +266,7 @@ Las versiones se administrarán centralmente en `Directory.Packages.props`. Una 
 | Paths recientes pierden permisos | Adaptadores de plataforma, descarte de entradas stale y error recuperable |
 | Proyecto grande degrada calendario | Colecciones virtualizadas, recomputación incremental y pruebas de rendimiento |
 | Autosave compite con edición/guardado manual | CancellationToken, snapshot consistente y serialización exclusiva |
-| API Uno no cubre una integración del sistema | Adapter en `CineSched.App/Platform`; nunca contaminar Core |
+| API Uno no cubre una integración del sistema | Servicio específico dentro de `CineSched.App/Platform`; nunca contaminar Core |
 
 ## 12. Definition of Done
 

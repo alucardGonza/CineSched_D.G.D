@@ -14,7 +14,7 @@ Los escenarios utilizan keywords Gherkin en inglés para facilitar su traslado p
 |---|---|
 | `@core` | Regla pura o caso de uso cubierto por pruebas unitarias de Core |
 | `@compatibility` | Contrato de archivo compartido entre Swift y .NET |
-| `@integration` | Pipeline que combina varias piezas reales; solo se definen cuatro suites |
+| `@integration` | Pipeline que combina varias piezas reales; solo se definen cuatro clases dentro del mismo proyecto de tests |
 | `@ui` | Comportamiento de presentación Uno |
 | `@manual` | Requiere comprobación visual o interacción real de escritorio |
 | `@pdf` | Regla de un reporte PDF |
@@ -26,7 +26,7 @@ Los escenarios utilizan keywords Gherkin en inglés para facilitar su traslado p
 - **Escena estructural**: escena, banner, comida o evento cuyo movimiento puede deshacerse.
 - **Página**: ocho octavos; internamente `duration` siempre se guarda en octavos enteros.
 - **Tiempo estimado**: minutos enteros.
-- **Proyecto actual**: estado de `ProjectSession`, incluyendo documento, archivo asociado, dirty state y undo/redo.
+- **Proyecto actual**: estado mantenido por `ProjectService`, incluyendo documento, dirty state y undo/redo; el archivo asociado pertenece a App.
 - **Evento de calendario**: item visual asociado a un día que no cuenta como escena ni entra al Boneyard.
 
 ### Invariantes globales
@@ -137,7 +137,7 @@ Feature: Autosave y archivos recientes
 Feature: Decodificar proyectos Swift
   Scenario: Abrir un proyecto v4.5.0 completo
     Given un fixture producido con el esquema Codable v4.5.0
-    When se decodifica con SwiftCompatibleProjectCodec
+    When se decodifica con ProjectService
     Then se conservan todos los UUID, fechas, escenas, shoot days y datos de producción
     And se conservan banners, comidas, eventos, breakdown y schedule lock
 
@@ -776,7 +776,7 @@ Feature: Experiencia Fluent de escritorio
   Scenario: Usar pickers y clipboard
     Given la plataforma ofrece integración de escritorio
     When se abre, guarda o copia información
-    Then se utiliza el servicio de plataforma a través de un adapter App
+    Then se utiliza un servicio concreto de plataforma dentro de App
     And Core no recibe tipos Uno ni handles de ventana
 ```
 
@@ -801,7 +801,7 @@ Feature: Pipeline funcional de un proyecto
 
 ## 15. Mapeo de pruebas a implementar
 
-### `CineSched.Core.Tests`
+### `CineSched.Tests/Unit`
 
 Las pruebas unitarias se agruparán por slice y utilizarán nombres de comportamiento:
 
@@ -817,16 +817,16 @@ Las pruebas unitarias se agruparán por slice y utilizarán nombres de comportam
 
 Cada escenario `@core` debe tener al menos una prueba directamente rastreable por nombre. Los Scenario Outline se implementarán como teorías parametrizadas.
 
-### `CineSched.IntegrationTests`
+### `CineSched.Tests/Integration`
 
-Solo contendrá estas cuatro suites:
+El mismo proyecto de tests contendrá únicamente estas cuatro clases de integración:
 
 1. `ProjectCompatibilityPipelineTests`.
 2. `ScriptImportPipelineTests`.
 3. `ProjectWorkflowPipelineTests`.
 4. `ReportGenerationPipelineTests`.
 
-No se agregarán integraciones para repetir validaciones ya cubiertas por handlers aislados. Una nueva prueba de integración requerirá justificar qué frontera real no puede validarse con una prueba Core.
+No se agregarán integraciones para repetir validaciones ya cubiertas por los métodos de cada service. Una nueva prueba de integración requerirá justificar qué frontera real no puede validarse con una prueba Core.
 
 ### Aceptación manual UI
 

@@ -6,8 +6,8 @@ Este documento define cómo se construirá CineSched multiplataforma. [SPEC.md](
 
 La arquitectura tiene dos proyectos de producción:
 
-- `CineSched.Core`: estado, dominio, vertical slices y capacidades portables.
-- `CineSched.App`: interfaz Uno, composición y adaptadores del entorno de escritorio.
+- `CineSched.Core`: vertical slices completas; cada una contiene un `Models.cs` y un único service con todas sus operaciones.
+- `CineSched.App`: interfaz Uno y servicios concretos del entorno de escritorio.
 
 La regla central es estricta: **App depende de Core; Core nunca depende de App, Uno, WinUI ni una plataforma**.
 
@@ -35,21 +35,21 @@ WinUI 3 no se ejecuta en Linux. Uno proyecta el modelo de controles y XAML de Wi
 
 El proyecto solicitó una separación clara de lógica y UI sin la ceremonia de Clean Architecture completa. Por eso no habrá proyectos separados Domain, Application e Infrastructure.
 
-- Core agrupa dominio, aplicación portable, codecs, importadores y reportes.
-- App agrupa UI y adapters que necesitan APIs del host.
-- Los proyectos de pruebas no cuentan como capas de producción.
+- Core agrupa entidades y operaciones por vertical slice; no tendrá carpetas horizontales separadas de Domain, Application, Ports o Infrastructure.
+- App agrupa UI y servicios concretos que necesitan APIs del host.
+- Un único proyecto `CineSched.Tests` contiene pruebas unitarias y las pocas integraciones de alto valor.
 
-### ADR-003: vertical slices sin MediatR
+### ADR-003: un service por vertical slice
 
-Cada capacidad se organiza por feature y operación. Un handler se inyecta directamente en el view model o en otro handler; no se incorpora un bus global ni reflexión. Esto mantiene navegación explícita y reduce dependencias.
+Cada capacidad se organiza por feature, no por operación. Sus modelos se agrupan en `Models.cs` y todas sus funciones públicas en `<Feature>Service.cs`. No existen handlers individuales, bus global, reflexión ni una carpeta por comando.
 
 ### ADR-004: estado de documento centralizado
 
-`ProjectSession` es la única autoridad mutable de una ventana. Los handlers reciben requests, construyen un nuevo estado válido y solicitan a la sesión aplicar el cambio. La UI nunca modifica listas del documento directamente.
+`ProjectService` es la única autoridad mutable de una ventana. Los demás services reciben parámetros o modelos simples, construyen un nuevo estado válido y solicitan a `ProjectService` aplicar el cambio. La UI nunca modifica listas del documento directamente.
 
-### ADR-005: streams como límite de archivos
+### ADR-005: streams como límite simple de archivos
 
-Core lee y escribe `Stream`. App decide cómo obtenerlo mediante pickers, permisos y rutas. De ese modo, Core es idéntico en las tres plataformas.
+Core lee y escribe `Stream`. App decide cómo obtenerlo mediante servicios concretos de pickers, permisos y rutas. No se modelan ports ni adapters: el stream es suficiente para mantener Core portable.
 
 ### ADR-006: PDFsharp Core y fuentes embebidas
 
@@ -63,35 +63,29 @@ flowchart TB
         Xaml[XAML Views and Controls]
         VM[ViewModels]
         Shell[Shell and Navigation]
-        Adapters[Desktop Adapters]
+        Desktop[Concrete Desktop Services]
         Bootstrap[Composition Root]
     end
 
     subgraph Core["CineSched.Core"]
-        Features[Vertical Slice Handlers]
-        Session[ProjectSession]
-        Domain[Domain Models and Rules]
-        Ports[Ports]
-        Codec[Swift JSON Codec]
-        Import[Script Importers]
-        Reports[PDF Report Generators]
+        Projects[Projects<br/>Models + ProjectService]
+        Scenes[Scenes / Scheduling<br/>Models + Services]
+        Production[Production / Call Sheets<br/>Models + Services]
+        Import[Script Import<br/>Models + Service]
+        Reports[Reports<br/>Models + ReportService]
     end
 
     Xaml --> VM
-    VM --> Features
+    VM --> Projects
+    VM --> Scenes
+    VM --> Production
+    VM --> Import
+    VM --> Reports
     Bootstrap --> VM
-    Bootstrap --> Adapters
-    Adapters -. implement .-> Ports
-    Features --> Session
-    Features --> Domain
-    Features --> Ports
-    Codec --> Domain
-    Import --> Domain
-    Reports --> Domain
+    Bootstrap --> Desktop
+    Desktop --> Projects
 
-    CoreTests[CineSched.Core.Tests] --> Core
-    IntegrationTests[CineSched.IntegrationTests] --> Core
-    IntegrationTests --> Adapters
+    Tests[CineSched.Tests<br/>Unit + Integration] --> Core
 ```
 
 ### Dependencias NuGet permitidas
@@ -100,8 +94,7 @@ flowchart TB
 |---|---|
 | `CineSched.Core` | BCL de .NET 10 y PDFsharp 6.2.4 |
 | `CineSched.App` | Uno SDK 6.6.42, CommunityToolkit.Mvvm 8.4.2 y `CineSched.Core` |
-| `CineSched.Core.Tests` | xUnit, test SDK y `CineSched.Core` |
-| `CineSched.IntegrationTests` | xUnit, test SDK, Core y adapters explícitamente expuestos para pruebas |
+| `CineSched.Tests` | xUnit, test SDK y `CineSched.Core` |
 
 Core no puede referenciar `Microsoft.UI.Xaml`, `Windows.Storage.Pickers`, `DispatcherQueue`, tipos de ventana, clipboard o controles.
 
@@ -119,112 +112,42 @@ ARCHITECTURE.md
 src/
   CineSched.Core/
     CineSched.Core.csproj
-    Domain/
-      Projects/
-        ProjectDocument.cs
-        ProjectSession.cs
-        ProjectSnapshot.cs
-      Scenes/
-        Scene.cs
-        DayNightType.cs
-        BannerType.cs
-        MealKind.cs
-      Scheduling/
-        ShootDay.cs
-        TimelineItem.cs
-      Production/
-        ProductionInfo.cs
-        CastMember.cs
-        CrewMember.cs
-        Location.cs
-        DateRange.cs
-      CallSheets/
-        CallSheetData.cs
-        CastCallEntry.cs
-        CrewCallEntry.cs
-      ScheduleLock/
-        ScheduleLock.cs
-        ScheduleLockChange.cs
+    Common/
+      Models.cs
     Features/
       Projects/
-        NewProject/
-          NewProjectRequest.cs
-          NewProjectHandler.cs
-          NewProjectResult.cs
-        OpenProject/
-        SaveProject/
-        Autosave/
+        Models.cs
+        ProjectService.cs
       Scenes/
-        CreateScene/
-        EditScene/
-        DuplicateScene/
-        DeleteScene/
-        SearchScenes/
-        SortBoneyard/
+        Models.cs
+        SceneService.cs
       Scheduling/
-        ChangeDateRange/
-        MoveScenes/
-        ReorderScenes/
-        MoveWholeDay/
-        SetBlackout/
-        Undo/
-        Redo/
+        Models.cs
+        SchedulingService.cs
       Stripboard/
-        AddBanner/
-        AddMeal/
-        AddCalendarEvent/
-        CalculateTimeline/
+        Models.cs
+        StripboardService.cs
       Production/
-        UpdateProductionInfo/
-        ManageCast/
-        ManageCrew/
-        ManageLocations/
+        Models.cs
+        ProductionService.cs
       CallSheets/
-        OpenCallSheet/
-        UpdateCallSheet/
+        Models.cs
+        CallSheetService.cs
       Conflicts/
-        ScanConflicts/
+        Models.cs
+        ConflictService.cs
       ScheduleLock/
-        LockSchedule/
-        UnlockSchedule/
-        GetScheduleLockChanges/
+        Models.cs
+        ScheduleLockService.cs
       ScriptImport/
-        ImportScript/
+        Models.cs
+        ScriptImportService.cs
       Reports/
-        GenerateReport/
+        Models.cs
+        ReportService.cs
       Settings/
-        Localization/
-    Serialization/
-      SwiftCompatibleProjectCodec.cs
-      SwiftDateJsonConverter.cs
-      LegacyCastJsonConverter.cs
-      JsonDefaults.cs
-    Importing/
-      FinalDraft/
-      Fountain/
-      Highland/
-    Reporting/
-      Layout/
-      Fonts/
-      Schedule/
-      Stripboard/
-      ShootingSchedule/
-      DaysOutOfDays/
-      Breakdown/
-      CallSheet/
-    Ports/
-      IProjectCodec.cs
-      IScriptImporter.cs
-      IReportGenerator.cs
-      IFileDialogService.cs
-      IPreferencesStore.cs
-      IAutosaveStore.cs
-      IRecentFilesStore.cs
-      IClock.cs
-    Common/
-      Result.cs
-      Error.cs
-      Guard.cs
+        Models.cs
+        SettingsService.cs
 
   CineSched.App/
     CineSched.App.csproj
@@ -256,11 +179,11 @@ src/
       NavigationService.cs
       DialogService.cs
       AppLifecycleService.cs
-    Platform/
       FileDialogService.cs
-      PreferencesStore.cs
-      AutosaveStore.cs
-      RecentFilesStore.cs
+      PreferencesService.cs
+      AutosaveService.cs
+      RecentFilesService.cs
+    Platforms/
       Windows/
       Linux/
       MacOS/
@@ -274,26 +197,28 @@ src/
       Images/
 
 tests/
-  CineSched.Core.Tests/
-    Projects/
-    Scenes/
-    Scheduling/
-    Stripboard/
-    Production/
-    CallSheets/
-    Conflicts/
-    ScheduleLock/
-    ScriptImport/
-    Reports/
-  CineSched.IntegrationTests/
-    ProjectCompatibilityPipelineTests.cs
-    ScriptImportPipelineTests.cs
-    ProjectWorkflowPipelineTests.cs
-    ReportGenerationPipelineTests.cs
-  TestAssets/
-    Projects/
-    Scripts/
-    Expected/
+  CineSched.Tests/
+    CineSched.Tests.csproj
+    Unit/
+      ProjectServiceTests.cs
+      SceneServiceTests.cs
+      SchedulingServiceTests.cs
+      StripboardServiceTests.cs
+      ProductionServiceTests.cs
+      CallSheetServiceTests.cs
+      ConflictServiceTests.cs
+      ScheduleLockServiceTests.cs
+      ScriptImportServiceTests.cs
+      ReportServiceTests.cs
+    Integration/
+      ProjectCompatibilityPipelineTests.cs
+      ScriptImportPipelineTests.cs
+      ProjectWorkflowPipelineTests.cs
+      ReportGenerationPipelineTests.cs
+    TestAssets/
+      Projects/
+      Scripts/
+      Expected/
 
 packaging/
   linux/
@@ -309,35 +234,62 @@ packaging/
 
 La lista muestra destinos arquitectónicos, no obliga a crear carpetas vacías. Una carpeta aparece cuando contiene su primer tipo real.
 
+No existe un directorio `Domain` separado. Cada slice tiene dos archivos principales:
+
+- `Models.cs`: todas las entidades, enums, DTOs, parámetros y resultados propios de la feature.
+- `<Feature>Service.cs`: todas las operaciones públicas y helpers privados de esa feature.
+
+Por ejemplo, `Scene`, `DayNightType` y los datos de edición viven juntos en `Features/Scenes/Models.cs`; crear, editar, duplicar, eliminar, buscar, ordenar y hacer parsing viven juntos en `SceneService.cs`. `Common/Models.cs` solo contiene `Result<T>`, `Error` y valores realmente transversales.
+
 ## 6. Anatomía de un vertical slice
 
-Cada operación contiene request, handler y result. Se añade validator solo si la operación tiene reglas de entrada propias.
+Cada slice expone un único service concreto. No se crea una clase handler ni una carpeta por operación. Los parámetros complejos y resultados se declaran junto a las entidades en `Models.cs`.
 
 ```csharp
+// Features/Scheduling/Models.cs
+public sealed record ShootDay(Guid Id, DateTimeOffset Date, IReadOnlyList<Scene> Scenes);
+
 public sealed record MoveScenesRequest(
     IReadOnlyList<Guid> SceneIds,
     Guid? SourceDayId,
     Guid TargetDayId,
     int TargetIndex);
 
-public sealed record MoveScenesResult(ProjectDocument Document);
-
-public sealed class MoveScenesHandler
+// Features/Scheduling/SchedulingService.cs
+public sealed class SchedulingService
 {
-    public Result<MoveScenesResult> Handle(
-        ProjectSession session,
-        MoveScenesRequest request);
+    public Result<ProjectDocument> ChangeDateRange(ChangeDateRangeRequest request)
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> MoveScenes(MoveScenesRequest request)
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> ReorderScenes(ReorderScenesRequest request)
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> MoveWholeDay(MoveWholeDayRequest request)
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> SetBlackout(SetBlackoutRequest request)
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> Undo()
+        => throw new NotImplementedException();
+
+    public Result<ProjectDocument> Redo()
+        => throw new NotImplementedException();
 }
 ```
 
 Reglas:
 
-- El request contiene valores portables y no referencia controles.
-- El handler valida invariantes y devuelve `Result<T>`; los errores esperados no usan excepciones.
-- El handler aplica el nuevo documento por `ProjectSession.Apply(...)` una sola vez.
+- `Models.cs` contiene todos los modelos de la slice y no referencia controles.
+- El service valida invariantes y devuelve `Result<T>`; los errores esperados no usan excepciones.
+- El service obtiene y aplica el estado mediante `ProjectService` una sola vez por operación.
 - Una operación estructural captura undo antes de aplicar y limpia redo.
-- Las queries no cambian dirty state ni historial.
-- No existe una carpeta genérica `Services` en Core para acumular lógica sin dueño; cada regla pertenece a una feature o a un tipo de dominio compartido.
+- Los métodos de consulta no cambian dirty state ni historial.
+- Los algoritmos auxiliares se mantienen como métodos privados en el mismo service.
+- No existen carpetas horizontales `Domain`, `Application`, `Ports`, `Adapters` o `Services` en Core. Cada entidad y operación pertenece a una vertical slice.
 
 ## 7. Modelo de estado
 
@@ -355,24 +307,23 @@ public sealed record ProjectDocument(
     ProductionInfo? ProductionInfo);
 ```
 
-Los nombres C# pueden seguir PascalCase; `SwiftCompatibleProjectCodec` controla los nombres wire camelCase.
+Los nombres C# pueden seguir PascalCase; los métodos JSON de `ProjectService` controlan los nombres wire camelCase.
 
-### `ProjectSession`
+### `ProjectService`
 
-Contiene estado de ejecución que no se serializa dentro del documento:
+Es el único service con estado de ejecución que no se serializa dentro del documento:
 
 - `CurrentDocument`.
-- Archivo manual asociado, representado mediante un token/adaptador App y no una ruta obligatoria en Core.
 - `IsDirty`.
 - Undo y redo, máximo 30 snapshots.
 - Número monotónico de revisión para ignorar autosaves obsoletos.
 - Evento portable `Changed`, con tipo de cambio y revisión.
 
-Solo handlers pueden llamar `Apply`. Los view models obtienen proyecciones de lectura y convierten el evento en propiedades observables.
+El archivo manual asociado, sus permisos y recientes permanecen en los services de App. Los demás services de Core llaman los métodos internos de `ProjectService` para leer un snapshot y aplicar un resultado. `SchedulingService.Undo` y `SchedulingService.Redo` usan el historial mantenido por `ProjectService`.
 
 ### Mutabilidad
 
-Los modelos expuestos se tratan como valores. Un handler crea colecciones nuevas para la parte modificada y reutiliza valores inmutables no afectados. Esto hace seguro el snapshot de undo y evita que una vista modifique Core por referencia.
+Los modelos expuestos se tratan como valores. Cada service crea colecciones nuevas para la parte modificada y reutiliza valores inmutables no afectados. Esto hace seguro el snapshot de undo y evita que una vista modifique Core por referencia.
 
 ## 8. Contratos públicos
 
@@ -399,62 +350,87 @@ Errores base:
 - `import.unsupported-extension`, `import.invalid-fdx`, `import.invalid-highland`, `import.no-scenes`.
 - `report.no-data`, `report.generation-failed`.
 
-### Archivos y serialización
+### Servicios concretos de Core
 
 ```csharp
-public interface IProjectCodec
+public sealed class ProjectService
 {
-    ValueTask<Result<ProjectDocument>> DecodeAsync(
-        Stream source, CancellationToken cancellationToken);
+    public ProjectDocument CurrentDocument { get; }
+    public bool IsDirty { get; }
 
-    ValueTask<Result<Unit>> EncodeAsync(
-        ProjectDocument document,
+    public Result<ProjectDocument> NewProject(DateTimeOffset now)
+        => throw new NotImplementedException();
+
+    public ValueTask<Result<ProjectDocument>> OpenAsync(
+        Stream source, CancellationToken cancellationToken)
+        => throw new NotImplementedException();
+
+    public ValueTask<Result<Unit>> SaveAsync(
         Stream destination,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken)
+        => throw new NotImplementedException();
 }
 
-public interface IScriptImporter
+public sealed class ScriptImportService
 {
-    bool Supports(string extension);
-    ValueTask<Result<ScriptImportResult>> ImportAsync(
+    public bool Supports(string extension)
+        => throw new NotImplementedException();
+
+    public ValueTask<Result<ScriptImportResult>> ImportAsync(
         Stream source,
         string extension,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken)
+        => throw new NotImplementedException();
 }
 
-public interface IReportGenerator
+public sealed class ReportService
 {
-    ReportKind Kind { get; }
-    ValueTask<Result<Unit>> GenerateAsync(
+    public ValueTask<Result<Unit>> GenerateAsync(
+        ReportKind kind,
         ReportRequest request,
         Stream destination,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken)
+        => throw new NotImplementedException();
 }
 ```
 
 `ReportKind` contiene exactamente `Schedule`, `Stripboard`, `ShootingSchedule`, `DaysOutOfDays`, `Breakdown` y `CallSheet`.
 
-### Puertos implementados en App
+Estas clases viven dentro de sus respectivas slices (`Projects`, `ScriptImport` y `Reports`). Cada una concentra todas las operaciones públicas de su feature; los parsers y renderers son métodos privados del mismo service. No se crean interfaces ni handlers por operación.
+
+### Servicios concretos de App
 
 ```csharp
-public interface IFileDialogService
+public sealed class FileDialogService
 {
-    ValueTask<PickedFile?> PickProjectToOpenAsync(CancellationToken cancellationToken);
-    ValueTask<PickedFile?> PickScriptToImportAsync(CancellationToken cancellationToken);
-    ValueTask<WritableFile?> PickProjectToSaveAsync(string suggestedName, CancellationToken cancellationToken);
-    ValueTask<WritableFile?> PickReportToSaveAsync(string suggestedName, CancellationToken cancellationToken);
+    public ValueTask<StorageFile?> PickProjectToOpenAsync(CancellationToken cancellationToken)
+        => throw new NotImplementedException();
+
+    public ValueTask<StorageFile?> PickScriptToImportAsync(CancellationToken cancellationToken)
+        => throw new NotImplementedException();
+
+    public ValueTask<StorageFile?> PickProjectToSaveAsync(
+        string suggestedName, CancellationToken cancellationToken)
+        => throw new NotImplementedException();
+
+    public ValueTask<StorageFile?> PickReportToSaveAsync(
+        string suggestedName, CancellationToken cancellationToken)
+        => throw new NotImplementedException();
 }
 
-public interface IPreferencesStore
+public sealed class PreferencesService
 {
-    T Get<T>(string key, T fallback);
-    ValueTask SetAsync<T>(string key, T value, CancellationToken cancellationToken);
+    public T Get<T>(string key, T fallback)
+        => throw new NotImplementedException();
+
+    public ValueTask SetAsync<T>(string key, T value, CancellationToken cancellationToken)
+        => throw new NotImplementedException();
 }
 ```
 
-`PickedFile` y `WritableFile` exponen nombre, extensión y funciones para abrir streams. No exponen `StorageFile` ni un tipo de plataforma.
+App puede usar `StorageFile` y otros tipos Uno porque esos tipos no cruzan a Core. `FileDialogService` abre el stream y entrega únicamente el stream, extensión y datos simples al service correspondiente.
 
-`IAutosaveStore` guarda un snapshot en app data. `IRecentFilesStore` conserva máximo diez tokens/entradas únicas. `IClock` permite probar fechas, debounce y nombres de reporte de forma determinista.
+`AutosaveService` guarda snapshots en app data y `RecentFilesService` conserva máximo diez entradas únicas. Cuando un service Core necesita la hora actual, su método recibe explícitamente `DateTimeOffset now`; las pruebas no requieren una abstracción de reloj.
 
 ## 9. Compatibilidad JSON
 
@@ -483,40 +459,36 @@ Save y autosave serializan un snapshot con revisión fija. Para un archivo manua
 sequenceDiagram
     actor User
     participant View as MainViewModel
-    participant Picker as IFileDialogService
-    participant Handler as OpenProjectHandler
-    participant Codec as IProjectCodec
-    participant Session as ProjectSession
+    participant Picker as FileDialogService
+    participant Projects as ProjectService
 
     User->>View: Open
     View->>Picker: PickProjectToOpenAsync
-    Picker-->>View: PickedFile or cancel
-    View->>Handler: Open(stream)
-    Handler->>Codec: DecodeAsync
-    Codec-->>Handler: Result<ProjectDocument>
-    Handler->>Session: Replace(document)
-    Session-->>View: Changed(revision)
+    Picker-->>View: StorageFile or cancel
+    View->>Projects: OpenAsync(stream)
+    Projects->>Projects: Decode and replace current document
+    Projects-->>View: Result and Changed(revision)
     View->>View: Refresh projections
 ```
 
-Cancelación o error termina antes de `Session.Replace`, por lo que el proyecto actual no cambia.
+Cancelación o error termina antes de reemplazar `CurrentDocument`, por lo que el proyecto actual no cambia.
 
 ### Modificar y autosave
 
 ```mermaid
 sequenceDiagram
     participant VM as Feature ViewModel
-    participant Handler as Feature Handler
-    participant Session as ProjectSession
+    participant Service as Feature Service
+    participant Projects as ProjectService
     participant Lifecycle as AppLifecycleService
-    participant Store as IAutosaveStore
+    participant Store as AutosaveService
 
-    VM->>Handler: Execute(request)
-    Handler->>Session: Apply(new document, structural)
-    Session-->>Lifecycle: Changed(revision, dirty)
+    VM->>Service: Call operation
+    Service->>Projects: Apply(new document, structural)
+    Projects-->>Lifecycle: Changed(revision, dirty)
     Lifecycle->>Lifecycle: Cancel previous delay
     Lifecycle->>Lifecycle: Wait 2 seconds
-    Lifecycle->>Session: Snapshot(revision)
+    Lifecycle->>Projects: Snapshot(revision)
     Lifecycle->>Store: Save(snapshot)
 ```
 
@@ -526,7 +498,7 @@ El autosave no limpia el dirty state de un archivo manual. Solo Save/Save As con
 
 ```mermaid
 flowchart LR
-    Picker[Pick script] --> Router[ImportScriptHandler]
+    Picker[Pick script] --> Router[ScriptImportService]
     Router -->|fdx/xml| FDX[FinalDraft importer]
     Router -->|fountain/md/spmd| Fountain[Fountain importer]
     Router -->|highland| Highland[Highland archive reader]
@@ -542,7 +514,7 @@ flowchart LR
 
 ### Generar un reporte
 
-App solicita el destino, construye `ReportRequest` desde un snapshot, selecciona el generator por `ReportKind` y le entrega un stream. El generator calcula layout y escribe PDF. Solo después de éxito App muestra confirmación; reportes nunca mutan `ProjectSession`.
+App solicita el destino, construye los parámetros desde un snapshot, llama `ReportService.GenerateAsync` con el `ReportKind` y le entrega un stream. El service calcula layout y escribe PDF. Solo después de éxito App muestra confirmación; los reportes nunca mutan `ProjectService`.
 
 ## 11. Reglas de dominio compartidas
 
@@ -568,7 +540,7 @@ App solicita el destino, construye `ReportRequest` desde un snapshot, selecciona
 4. Área central para Calendar o Stripboard.
 5. Capa de dialogs y notificaciones.
 
-La navegación no reemplaza el documento. Dialogs editan drafts y solo ejecutan el handler al confirmar.
+La navegación no reemplaza el documento. Dialogs editan drafts y solo llaman el método correspondiente del service al confirmar.
 
 ### View models
 
@@ -580,7 +552,7 @@ La navegación no reemplaza el documento. Dialogs editan drafts y solo ejecutan 
 
 ### Drag-and-drop
 
-El payload contiene UUIDs serializados y tipo de operación, no objetos completos. App calcula el target visual y llama `MoveScenesHandler`. Core vuelve a validar source, target, posición e invariantes. El mismo handler sirve a drag-and-drop, Send to Day y context menus.
+El payload contiene UUIDs serializados y tipo de operación, no objetos completos. App calcula el target visual y llama `SchedulingService.MoveScenes`. Core vuelve a validar source, target, posición e invariantes. El mismo método sirve a drag-and-drop, Send to Day y context menus.
 
 ### Animaciones
 
@@ -591,22 +563,22 @@ Se utilizan Storyboards/Composition para opacity y transforms cortos, normalment
 - Recursos `.resw` en `en` y `es` sustituyen el diccionario Swift.
 - Core utiliza keys estables para errores y labels industriales; el PDF recibe un `ReportCulture` explícito.
 - Los temas `system`, `blue`, `green` y `yellow` se definen como ResourceDictionaries light/dark.
-- Tema, idioma y sidebar se guardan mediante `IPreferencesStore`, no en el proyecto.
+- Tema, idioma y sidebar se guardan mediante `PreferencesService` en App, no en el proyecto.
 
-## 13. Adaptadores de plataforma
+## 13. Servicios de plataforma
 
-El código condicional solo se permite dentro de `CineSched.App/Platform`.
+El código condicional solo se permite dentro de `CineSched.App/Platforms` o en partial classes de sus servicios concretos. No se define una capa de ports/adapters.
 
 ### File dialogs
 
 - Preferencia: pickers Uno con APIs WinUI compatibles.
-- Si un target no conserva acceso persistente, su adapter almacena el token/bookmark apropiado.
+- Si un target no conserva acceso persistente, `RecentFilesService` almacena el token/bookmark apropiado con código específico de plataforma.
 - Cancelar devuelve `null`; permisos o I/O devuelven `Error` presentable.
 
 ### Recientes
 
 - Windows/Linux pueden conservar path/token conforme a permisos del host.
-- macOS debe conservar acceso mediante el mecanismo ofrecido por el host Uno o un adapter de bookmark.
+- macOS debe conservar acceso mediante el mecanismo ofrecido por el host Uno o código específico de bookmark en `RecentFilesService`.
 - Resolver una entrada nunca debe iniciar la carga automáticamente.
 - Entradas inexistentes o stale se eliminan sin romper startup.
 
@@ -629,15 +601,15 @@ El font resolver se registra una vez antes del primer documento y rechaza famili
 ## 15. Errores, logging y observabilidad
 
 - Errores esperados usan `Result<T>`.
-- Excepciones se reservan para defectos o fallos inesperados y se convierten a un error en el boundary del handler.
+- Excepciones se reservan para defectos o fallos inesperados y se convierten a un error en el método público del service.
 - App registra diagnóstico local con categoría y stack trace, sin incluir contenido de guiones o información personal.
 - Mensajes al usuario son localizables y ofrecen reintentar o cancelar cuando tiene sentido.
 - No se agrega telemetría remota.
 
 ## 16. Concurrencia
 
-- Los handlers Core son thread-agnostic; App aplica notificaciones de binding en el dispatcher UI.
-- `ProjectSession` serializa mutaciones con una única sección crítica corta.
+- Los services Core son thread-agnostic; App aplica notificaciones de binding en el dispatcher UI.
+- `ProjectService` serializa mutaciones con una única sección crítica corta.
 - Parsing, JSON y PDF pueden ejecutarse fuera del UI thread sobre snapshots.
 - Cada operación larga acepta `CancellationToken`.
 - Autosave registra la revisión capturada y descarta su resultado si una revisión más nueva ya fue guardada.
@@ -647,13 +619,13 @@ El font resolver se registra una vez antes del primer documento y rechaza famili
 
 ```mermaid
 flowchart LR
-    Unit[Core unit tests<br/>many, fast] --> Rules[Domain and handlers]
-    Integration[4 integration suites] --> Boundaries[JSON, import, workflow, PDF]
+    Unit[Core unit tests<br/>many, fast] --> Rules[Models and services]
+    Integration[4 integration classes] --> Boundaries[JSON, import, workflow, PDF]
     Manual[3-platform checklist] --> UI[Uno rendering and desktop integration]
 ```
 
-- Unit tests usan `IClock`, streams en memoria y fakes de ports.
-- Integration tests usan archivos temporales bajo el test workspace y fixtures versionados.
+- Las pruebas unitarias pasan fechas explícitas en los requests y usan streams en memoria.
+- Las cuatro clases de integración viven en el mismo proyecto y usan archivos temporales bajo el test workspace y fixtures versionados.
 - Tests no dependen del orden global ni de preferencias reales del usuario.
 - UI manual valida lo que aporta valor visual; no se crea una suite extensa y frágil de automatización desktop.
 
@@ -685,8 +657,8 @@ Los primeros artifacts no estarán firmados. Packaging no puede modificar binari
 
 - Un test arquitectónico falla si `CineSched.Core` referencia assemblies Uno/WinUI.
 - Ningún view code-behind contiene parsing, scheduling, JSON o generación PDF.
-- Ningún handler abre pickers, muestra dialogs o consulta rutas del sistema.
+- Ningún service Core abre pickers, muestra dialogs o consulta rutas del sistema.
 - No se agrega estado persistido sin decidir si pertenece al documento compartido o a app data.
 - No se cambia el wire format sin fixture Swift y prueba `@compatibility`.
-- No se agrega una quinta suite de integración sin documentar la frontera que justifica su valor.
-- Toda feature nueva tiene handler Core, pruebas y escenario Gherkin antes de conectarse a UI.
+- No se agrega una quinta clase de integración sin documentar la frontera que justifica su valor.
+- Toda feature nueva se agrega al `Models.cs` y service de su slice, con pruebas y escenario Gherkin antes de conectarse a UI.
