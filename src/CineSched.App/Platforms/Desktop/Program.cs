@@ -9,9 +9,11 @@ internal static class Program
     {
         if (OperatingSystem.IsWindows())
         {
-            Uno.WinRTFeatureConfiguration.ApplicationData.ApplicationDataPathOverride = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CineSched");
+            var configuredAppData = Environment.GetEnvironmentVariable("CINESCHED_APPDATA_PATH");
+            Uno.WinRTFeatureConfiguration.ApplicationData.ApplicationDataPathOverride =
+                string.IsNullOrWhiteSpace(configuredAppData)
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CineSched")
+                    : Path.GetFullPath(configuredAppData);
         }
 
         var host = UnoPlatformHostBuilder.Create()

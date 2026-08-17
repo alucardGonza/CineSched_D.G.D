@@ -79,6 +79,7 @@ public sealed class MainViewModel : ObservableObject
         _recentFiles = recentFiles;
         _autosave = autosave;
         _settings.Update(_preferences.Get("app-settings", new AppSettings()));
+        _status = _settings.GetText("status.ready");
         _projects.Changed += (_, _) => Refresh();
         autosave.Start();
 
@@ -248,6 +249,8 @@ public sealed class MainViewModel : ObservableObject
     });
 
     public string CalendarLabel => _settings.GetText("nav.calendar");
+    public string FileMenuLabel => _settings.GetText("menu.file");
+    public string EditMenuLabel => _settings.GetText("menu.edit");
     public string StripboardLabel => _settings.GetText("nav.stripboard");
     public string ProductionLabel => _settings.GetText("nav.production");
     public string ReportsLabel => _settings.GetText("nav.reports");
@@ -265,6 +268,80 @@ public sealed class MainViewModel : ObservableObject
     public string SidebarLabel => _settings.GetText("settings.sidebar");
     public string HoldDaysLabel => _settings.GetText("settings.holdDays");
     public string ExportLabel => _settings.GetText("reports.export");
+    public string RecentProjectsLabel => _settings.GetText("ui.recent");
+    public string BoneyardLabel => _settings.GetText("ui.boneyard");
+    public string AddSceneLabel => _settings.GetText("ui.scene.add");
+    public string BreakdownLabel => _settings.GetText("ui.breakdown");
+    public string CopyLabel => _settings.GetText("ui.copy");
+    public string SearchPlaceholder => _settings.GetText("ui.search");
+    public string SortLabel => _settings.GetText("ui.sort");
+    public string SendToDayLabel => _settings.GetText("ui.sendToDay");
+    public string StartLabel => _settings.GetText("ui.start");
+    public string EndLabel => _settings.GetText("ui.end");
+    public string ShiftScheduleLabel => _settings.GetText("ui.shift");
+    public string ApplyRangeLabel => _settings.GetText("ui.applyRange");
+    public string SelectedStripboardLabel => _settings.GetText("ui.stripboard");
+    public string AddBannerLabel => _settings.GetText("ui.banner.add");
+    public string AddMealLabel => _settings.GetText("ui.meal.add");
+    public string AddEventLabel => _settings.GetText("ui.event.add");
+    public string ProductionSetupLabel => _settings.GetText("ui.productionSetup");
+    public string SaveProductionLabel => _settings.GetText("ui.saveProduction");
+    public string ExportReportLabel => _settings.GetText("ui.exportReport");
+    public string BreakdownBrowserLabel => _settings.GetText("ui.breakdownBrowser");
+    public string LockScheduleLabel => _settings.GetText("ui.lockSchedule");
+    public string UnlockScheduleLabel => _settings.GetText("ui.unlockSchedule");
+    public string EditLabel => _settings.GetText("ui.edit");
+    public string DuplicateLabel => _settings.GetText("ui.duplicate");
+    public string DeleteLabel => _settings.GetText("ui.delete");
+    public string RemoveLabel => _settings.GetText("ui.remove");
+    public string EighthsLabel => _settings.GetText("ui.eighths");
+    public string BlackoutLabel => _settings.GetText("ui.blackout");
+    public string AllWeekdaysLabel => _settings.GetText("ui.allWeekdays");
+    public string RostersLabel => _settings.GetText("ui.rosters");
+    public string CallSheetLabel => _settings.GetText("ui.callSheet");
+    public string ConflictsLockLabel => _settings.GetText("ui.conflictsLock");
+    public string CompanyLabel => _settings.GetText("ui.company");
+    public string DirectorLabel => _settings.GetText("ui.director");
+    public string DirectorPhoneLabel => _settings.GetText("ui.directorPhone");
+    public string ProducerLabel => _settings.GetText("ui.producer");
+    public string ProducerPhoneLabel => _settings.GetText("ui.producerPhone");
+    public string FirstAdLabel => _settings.GetText("ui.firstAd");
+    public string AdPhoneLabel => _settings.GetText("ui.adPhone");
+    public string ContactLabel => _settings.GetText("ui.contact");
+    public string DefaultLunchLabel => _settings.GetText("ui.defaultLunch");
+    public string CastLabel => _settings.GetText("ui.cast");
+    public string AddLabel => _settings.GetText("ui.add");
+    public string AvailabilityLabel => _settings.GetText("ui.availability");
+    public string CrewLabel => _settings.GetText("ui.crew");
+    public string LocationsLabel => _settings.GetText("ui.locations");
+    public string InitializeFromDayLabel => _settings.GetText("ui.initializeFromDay");
+    public string SelectCrewLabel => _settings.GetText("ui.selectCrew");
+    public string SaveCallSheetLabel => _settings.GetText("ui.saveCallSheet");
+    public string GeneralCallLabel => _settings.GetText("ui.generalCall");
+    public string WorkDayScheduleLabel => _settings.GetText("ui.workDaySchedule");
+    public string ReadyToShootLabel => _settings.GetText("ui.readyToShoot");
+    public string LunchLabel => _settings.GetText("ui.lunch");
+    public string SnackLabel => _settings.GetText("ui.snack");
+    public string DinnerLabel => _settings.GetText("ui.dinner");
+    public string WrapLabel => _settings.GetText("ui.wrap");
+    public string QuoteOfDayLabel => _settings.GetText("ui.quoteOfDay");
+    public string ProductionManagerContactLabel => _settings.GetText("ui.productionManagerContact");
+    public string AdContactLabel => _settings.GetText("ui.adContact");
+    public string WeatherTemperatureLabel => _settings.GetText("ui.weatherTemperature");
+    public string WeatherConditionsLabel => _settings.GetText("ui.weatherConditions");
+    public string PrecipitationWindLabel => _settings.GetText("ui.precipitationWind");
+    public string SunriseSunsetLabel => _settings.GetText("ui.sunriseSunset");
+    public string BasecampLabel => _settings.GetText("ui.basecamp");
+    public string NearestHospitalLabel => _settings.GetText("ui.nearestHospital");
+    public string CastCallsLabel => _settings.GetText("ui.castCalls");
+    public string CharacterLabel => _settings.GetText("ui.character");
+    public string ActorLabel => _settings.GetText("ui.actor");
+    public string ScenesLabel => _settings.GetText("ui.scenes");
+    public string OnSetLabel => _settings.GetText("ui.onSet");
+    public string NotesLabel => _settings.GetText("ui.notes");
+    public string ConflictsLabel => _settings.GetText("ui.conflicts");
+    public string LockBaselineLabel => _settings.GetText("ui.lockBaseline");
+    public string ScheduleLockChangesLabel => _settings.GetText("ui.scheduleLockChanges");
 
     public ProductionInfo ProductionDraft
     {
@@ -544,7 +621,7 @@ public sealed class MainViewModel : ObservableObject
         Replace(Boneyard, values);
     }
 
-    private void SetStatus<T>(Result<T> result) => Status = result.IsSuccess ? "Done" : result.Error!.Message;
+    private void SetStatus<T>(Result<T> result) => Status = result.IsSuccess ? _settings.GetText("status.done") : result.Error!.Message;
 
     private void SaveProduction()
     {
@@ -561,7 +638,7 @@ public sealed class MainViewModel : ObservableObject
             target.ContactNumber = draft.ContactNumber;
             target.DefaultLunchTime = draft.DefaultLunchTime;
         });
-        Status = "Production setup saved";
+        Status = _settings.GetText("status.productionSaved");
     }
 
     private void InitializeCallSheet()
@@ -637,15 +714,45 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IncludeHoldDays));
         OnPropertyChanged("Item[]");
         OnPropertyChanged(nameof(AccentBrush));
+        OnPropertyChanged(nameof(Languages));
+        OnPropertyChanged(nameof(Themes));
+        OnPropertyChanged(nameof(ColorModes));
+        OnPropertyChanged(nameof(BoneyardSorts));
+        OnPropertyChanged(nameof(ReportKinds));
         foreach (var property in new[]
                  {
-                     nameof(CalendarLabel), nameof(StripboardLabel), nameof(ProductionLabel), nameof(ReportsLabel),
+                     nameof(CalendarLabel), nameof(FileMenuLabel), nameof(EditMenuLabel), nameof(StripboardLabel), nameof(ProductionLabel), nameof(ReportsLabel),
                      nameof(SettingsLabel), nameof(NewLabel), nameof(OpenLabel), nameof(SaveLabel), nameof(SaveAsLabel),
                      nameof(ImportLabel), nameof(UndoLabel), nameof(RedoLabel), nameof(LanguageLabel), nameof(ThemeLabel),
-                     nameof(ColorModeLabel), nameof(SidebarLabel), nameof(HoldDaysLabel), nameof(ExportLabel)
+                     nameof(ColorModeLabel), nameof(SidebarLabel), nameof(HoldDaysLabel), nameof(ExportLabel),
+                     nameof(RecentProjectsLabel), nameof(BoneyardLabel), nameof(AddSceneLabel), nameof(BreakdownLabel),
+                     nameof(CopyLabel), nameof(SearchPlaceholder), nameof(SortLabel), nameof(SendToDayLabel),
+                     nameof(StartLabel), nameof(EndLabel), nameof(ShiftScheduleLabel), nameof(ApplyRangeLabel),
+                     nameof(SelectedStripboardLabel), nameof(AddBannerLabel), nameof(AddMealLabel), nameof(AddEventLabel),
+                     nameof(ProductionSetupLabel), nameof(SaveProductionLabel), nameof(ExportReportLabel),
+                     nameof(BreakdownBrowserLabel), nameof(LockScheduleLabel), nameof(UnlockScheduleLabel),
+                     nameof(EditLabel), nameof(DuplicateLabel), nameof(DeleteLabel), nameof(RemoveLabel),
+                     nameof(EighthsLabel), nameof(BlackoutLabel), nameof(AllWeekdaysLabel), nameof(RostersLabel),
+                     nameof(CallSheetLabel), nameof(ConflictsLockLabel), nameof(CompanyLabel), nameof(DirectorLabel),
+                     nameof(DirectorPhoneLabel), nameof(ProducerLabel), nameof(ProducerPhoneLabel), nameof(FirstAdLabel),
+                     nameof(AdPhoneLabel), nameof(ContactLabel), nameof(DefaultLunchLabel), nameof(CastLabel),
+                     nameof(AddLabel), nameof(AvailabilityLabel), nameof(CrewLabel), nameof(LocationsLabel),
+                     nameof(InitializeFromDayLabel), nameof(SelectCrewLabel), nameof(SaveCallSheetLabel),
+                     nameof(GeneralCallLabel), nameof(WorkDayScheduleLabel), nameof(ReadyToShootLabel),
+                     nameof(LunchLabel), nameof(SnackLabel), nameof(DinnerLabel), nameof(WrapLabel),
+                     nameof(QuoteOfDayLabel), nameof(ProductionManagerContactLabel), nameof(AdContactLabel),
+                     nameof(WeatherTemperatureLabel), nameof(WeatherConditionsLabel), nameof(PrecipitationWindLabel),
+                     nameof(SunriseSunsetLabel), nameof(BasecampLabel), nameof(NearestHospitalLabel),
+                     nameof(CastCallsLabel), nameof(CharacterLabel), nameof(ActorLabel), nameof(ScenesLabel),
+                     nameof(OnSetLabel), nameof(NotesLabel), nameof(ConflictsLabel), nameof(LockBaselineLabel),
+                     nameof(ScheduleLockChangesLabel)
                  })
             OnPropertyChanged(property);
-        if (languageChanged) Refresh();
+        if (languageChanged)
+        {
+            Status = _settings.GetText("status.ready");
+            Refresh();
+        }
         SettingsChanged?.Invoke(this, settings);
     }
 

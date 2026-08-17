@@ -24,11 +24,13 @@ public sealed partial class MainPage : Page
         _viewModel = viewModel;
         _dialogs = dialogs;
         DataContext = viewModel;
+        ShowWorkspace(MenuDefinitions.Calendar);
         Navigation.SelectedItem = Navigation.MenuItems[0];
         ApplySettings(viewModel.SelectedColorMode);
         viewModel.SettingsChanged += (_, settings) => ApplySettings(settings.ColorMode);
         Loaded += async (_, _) =>
         {
+            RecentFilesPanel.Visibility = Navigation.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
             if (XamlRoot is { } root) dialogs.Attach(root);
             if (_viewModel.ShootDays.Count > 0)
             {
@@ -50,18 +52,25 @@ public sealed partial class MainPage : Page
         ConfigureKeyboardAccelerators();
     }
 
+    private void Navigation_PaneOpening(NavigationView sender, object args) =>
+        RecentFilesPanel.Visibility = Visibility.Visible;
+
+    private void Navigation_PaneClosing(NavigationView sender, NavigationViewPaneClosingEventArgs args) =>
+        RecentFilesPanel.Visibility = Visibility.Collapsed;
+
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (args.SelectedItemContainer?.Tag is not string tag) return;
-        Workspace.SelectedIndex = tag switch
-        {
-            MenuDefinitions.Calendar => 0,
-            MenuDefinitions.Stripboard => 1,
-            MenuDefinitions.Production => 2,
-            MenuDefinitions.Reports => 3,
-            MenuDefinitions.Settings => 4,
-            _ => 0
-        };
+        ShowWorkspace(tag);
+    }
+
+    private void ShowWorkspace(string tag)
+    {
+        CalendarWorkspace.Visibility = tag == MenuDefinitions.Calendar ? Visibility.Visible : Visibility.Collapsed;
+        StripboardWorkspace.Visibility = tag == MenuDefinitions.Stripboard ? Visibility.Visible : Visibility.Collapsed;
+        ProductionWorkspace.Visibility = tag == MenuDefinitions.Production ? Visibility.Visible : Visibility.Collapsed;
+        ReportsWorkspace.Visibility = tag == MenuDefinitions.Reports ? Visibility.Visible : Visibility.Collapsed;
+        SettingsWorkspace.Visibility = tag == MenuDefinitions.Settings ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RecentFiles_ItemClick(object sender, ItemClickEventArgs args)
@@ -190,7 +199,7 @@ public sealed partial class MainPage : Page
         if (day is null) return;
         _viewModel.SelectedDay = day;
         Navigation.SelectedItem = Navigation.MenuItems[0];
-        Workspace.SelectedIndex = 0;
+        ShowWorkspace(MenuDefinitions.Calendar);
     }
 
     private async void AddScene_Click(object sender, RoutedEventArgs args) => await ShowSceneEditorAsync(null);
