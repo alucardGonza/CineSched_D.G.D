@@ -29,6 +29,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ScheduleLockService _scheduleLock;
     private readonly ClipboardService _clipboard;
     private readonly RecentFilesService _recentFiles;
+    private readonly AutosaveService _autosave;
     private ShootDay? _selectedDay;
     private Scene? _selectedBoneyardScene;
     private string _projectTitle = string.Empty;
@@ -76,6 +77,7 @@ public sealed class MainViewModel : ObservableObject
         _scheduleLock = scheduleLock;
         _clipboard = clipboard;
         _recentFiles = recentFiles;
+        _autosave = autosave;
         _settings.Update(_preferences.Get("app-settings", new AppSettings()));
         _projects.Changed += (_, _) => Refresh();
         autosave.Start();
@@ -116,6 +118,8 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<ColorMode> ColorModes { get; } = Enum.GetValues<ColorMode>();
 
     public event EventHandler<AppSettings>? SettingsChanged;
+
+    public string this[string key] => _settings.GetText(key);
 
     public IAsyncRelayCommand NewProjectCommand { get; }
     public IAsyncRelayCommand OpenProjectCommand { get; }
@@ -223,11 +227,23 @@ public sealed class MainViewModel : ObservableObject
         set => ChangeSettings(_settings.Current with { ColorMode = value });
     }
 
+    public bool IsSidebarOpen
+    {
+        get => !_settings.Current.IsSidebarCollapsed;
+        set => ChangeSettings(_settings.Current with { IsSidebarCollapsed = !value });
+    }
+
+    public bool IncludeHoldDays
+    {
+        get => _settings.Current.IncludeHoldDays;
+        set => ChangeSettings(_settings.Current with { IncludeHoldDays = value });
+    }
+
     public Brush AccentBrush => new SolidColorBrush(_settings.Current.Theme switch
     {
         CineSchedAppTheme.Green => Windows.UI.Color.FromArgb(255, 22, 163, 74),
         CineSchedAppTheme.Yellow => Windows.UI.Color.FromArgb(255, 202, 138, 4),
-        CineSchedAppTheme.System => (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"],
+        CineSchedAppTheme.System => GetSystemAccentColor(),
         _ => Windows.UI.Color.FromArgb(255, 37, 99, 235)
     });
 
@@ -246,6 +262,8 @@ public sealed class MainViewModel : ObservableObject
     public string LanguageLabel => _settings.GetText("settings.language");
     public string ThemeLabel => _settings.GetText("settings.theme");
     public string ColorModeLabel => _settings.GetText("settings.colorMode");
+    public string SidebarLabel => _settings.GetText("settings.sidebar");
+    public string HoldDaysLabel => _settings.GetText("settings.holdDays");
     public string ExportLabel => _settings.GetText("reports.export");
 
     public ProductionInfo ProductionDraft
@@ -293,6 +311,8 @@ public sealed class MainViewModel : ObservableObject
     public void DuplicateScene(Scene scene) => SetStatus(_scenes.DuplicateScene(scene.Id));
 
     public void DeleteScene(Scene scene) => SetStatus(_scenes.DeleteScene(scene.Id));
+
+    public IReadOnlyList<Scene> GetScriptOrder() => _scenes.GetScriptOrder();
 
     public void AddBanner(BannerType type, string title, string note, int duration, string color, string startTime)
     {
@@ -346,8 +366,9 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task NewProjectAsync()
     {
-        if (_projects.IsDirty && !await _messages.ConfirmAsync(
-                "Create a new project?", "Unsaved changes will remain only in the recovery autosave.", "Create"))
+        if (_projects.IsDirty && (!await _messages.ConfirmAsync(
+                "Create a new project?", "Unsaved changes will remain only in the recovery autosave.", "Create") ||
+            !await PreserveUnsavedSnapshotAsync()))
         {
             return;
         }
@@ -358,8 +379,9 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task OpenProjectAsync()
     {
-        if (_projects.IsDirty && !await _messages.ConfirmAsync(
-                "Open another project?", "The current project has unsaved changes.", "Open"))
+        if (_projects.IsDirty && (!await _messages.ConfirmAsync(
+                "Open another project?", "The current project has unsaved changes.", "Open") ||
+            !await PreserveUnsavedSnapshotAsync()))
         {
             return;
         }
@@ -430,12 +452,21 @@ public sealed class MainViewModel : ObservableObject
     private async Task OpenRecentAsync(string? identity)
     {
         if (string.IsNullOrWhiteSpace(identity)) return;
-        if (_projects.IsDirty && !await _messages.ConfirmAsync(
-                "Open recent project?", "The current project has unsaved changes.", "Open")) return;
+        if (_projects.IsDirty && (!await _messages.ConfirmAsync(
+                "Open recent project?", "The current project has unsaved changes.", "Open") ||
+            !await PreserveUnsavedSnapshotAsync())) return;
         var result = await _lifecycle.OpenRecentAsync(identity);
         if (result.IsSuccess && result.Value) Status = $"Opened {_lifecycle.AssociatedFile?.Name}";
         else if (!result.IsSuccess) Status = result.Error!.Message;
         RefreshRecentFiles();
+    }
+
+    private async Task<bool> PreserveUnsavedSnapshotAsync()
+    {
+        var result = await _autosave.SaveNowAsync(_projects.GetSnapshot(), markRecoverable: true);
+        if (result.IsSuccess) return true;
+        Status = $"Could not preserve unsaved changes: {result.Error!.Message}";
+        return false;
     }
 
     private void AddScene()
@@ -596,21 +627,35 @@ public sealed class MainViewModel : ObservableObject
     private void ChangeSettings(AppSettings settings)
     {
         if (settings == _settings.Current) return;
+        var languageChanged = settings.Language != _settings.Current.Language;
         _settings.Update(settings);
         _ = _preferences.SetAsync("app-settings", settings);
         OnPropertyChanged(nameof(SelectedLanguage));
         OnPropertyChanged(nameof(SelectedTheme));
         OnPropertyChanged(nameof(SelectedColorMode));
+        OnPropertyChanged(nameof(IsSidebarOpen));
+        OnPropertyChanged(nameof(IncludeHoldDays));
+        OnPropertyChanged("Item[]");
         OnPropertyChanged(nameof(AccentBrush));
         foreach (var property in new[]
                  {
                      nameof(CalendarLabel), nameof(StripboardLabel), nameof(ProductionLabel), nameof(ReportsLabel),
                      nameof(SettingsLabel), nameof(NewLabel), nameof(OpenLabel), nameof(SaveLabel), nameof(SaveAsLabel),
                      nameof(ImportLabel), nameof(UndoLabel), nameof(RedoLabel), nameof(LanguageLabel), nameof(ThemeLabel),
-                     nameof(ColorModeLabel), nameof(ExportLabel)
+                     nameof(ColorModeLabel), nameof(SidebarLabel), nameof(HoldDaysLabel), nameof(ExportLabel)
                  })
             OnPropertyChanged(property);
+        if (languageChanged) Refresh();
         SettingsChanged?.Invoke(this, settings);
+    }
+
+    private static Windows.UI.Color GetSystemAccentColor()
+    {
+        var resources = Application.Current?.Resources;
+        return resources is not null && resources.ContainsKey("SystemAccentColor") &&
+               resources["SystemAccentColor"] is Windows.UI.Color color
+            ? color
+            : Windows.UI.Color.FromArgb(255, 37, 99, 235);
     }
 
     private static string SafeName(string value)

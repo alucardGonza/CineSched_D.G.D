@@ -15,4 +15,20 @@ public sealed class ArchitectureTests
         Assert.DoesNotContain(types, type => type.Namespace?.Contains(".Ports", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(types, type => type.Namespace?.Contains(".Adapters", StringComparison.Ordinal) == true);
     }
+
+    [Fact]
+    public void EveryVerticalSlice_ExposesOneConcreteServiceWithItsModels()
+    {
+        var featureTypes = typeof(ProjectService).Assembly.GetTypes()
+            .Where(type => type.IsPublic && type.Namespace?.StartsWith("CineSched.Core.Features.", StringComparison.Ordinal) == true)
+            .GroupBy(type => type.Namespace!, StringComparer.Ordinal);
+
+        foreach (var slice in featureTypes)
+        {
+            var services = slice.Where(type => type.IsClass && type.Name.EndsWith("Service", StringComparison.Ordinal)).ToList();
+            Assert.Single(services);
+            Assert.Contains(slice, type => type != services[0] &&
+                (type.IsClass || type.IsEnum || type.IsValueType));
+        }
+    }
 }

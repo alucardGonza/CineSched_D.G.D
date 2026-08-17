@@ -1,12 +1,25 @@
-# CineSched (D.G.D Fork) - Film Production Scheduling & One-Line Schedule App
+# CineSched (D.G.D Fork) — cross-platform production scheduling
 
-A modern, high-performance macOS application for film and television scheduling — visual calendar scheduling, stripboard timeline cascading, vector shooting schedule (One-Line Schedule) PDF exports, bilingual (Español / English) localization, call sheet management, actor availability & conflict tracking, and script import.
+A cross-platform film and television scheduler built with .NET 10 and Uno Platform for Windows, Linux, and macOS. It includes visual calendar scheduling, stripboard timeline cascading, PDF reports, bilingual resources, call sheets, actor availability/conflict tracking, and script import. The original Swift implementation remains in the repository as the v4.5 compatibility reference.
 
-![Platform](https://img.shields.io/badge/platform-macOS-blue)
-![Swift](https://img.shields.io/badge/Swift-5.0-orange)
-![SwiftUI](https://img.shields.io/badge/SwiftUI-4.0-green)
-![Version](https://img.shields.io/badge/version-4.5.0-purple)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
+![.NET](https://img.shields.io/badge/.NET-10.0-purple)
+![Uno Platform](https://img.shields.io/badge/Uno%20Platform-6.6-teal)
+![Version](https://img.shields.io/badge/version-5.0.0-purple)
 ![License](https://img.shields.io/badge/license-GPL--v3-lightgrey)
+
+## Build and run
+
+The repository uses the .NET SDK selected by `global.json`.
+
+```powershell
+dotnet restore CineSched.slnx --locked-mode
+dotnet build CineSched.slnx -c Release --no-restore -warnaserror
+dotnet test tests/CineSched.Tests/CineSched.Tests.csproj -c Release --no-build
+dotnet run --project src/CineSched.App/CineSched.App.csproj -f net10.0-desktop
+```
+
+Core is organized by vertical slice. Every feature directory contains one `Models.cs` and one concrete `<Feature>Service.cs`; there are no ports, adapters, handlers, or entity-only layers. Unit and the four valuable end-to-end integration suites live in the single `CineSched.Tests` project. See [MIGRATION-PLAN.md](MIGRATION-PLAN.md), [SPEC.md](SPEC.md), and [ARCHITECTURE.md](ARCHITECTURE.md) for the migration contract.
 
 > **CineSched D.G.D Fork**: Enhanced with dynamic timeline cascade, 7-column production calendar, vector shooting schedule PDF generation, pure bilingual localization (Español / English), and independent calendar events.
 

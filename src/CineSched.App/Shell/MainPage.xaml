@@ -11,19 +11,42 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
-      <AppBarButton Icon="Add" Label="{Binding NewLabel}" Command="{Binding NewProjectCommand}" />
-      <AppBarButton Icon="OpenFile" Label="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" />
-      <AppBarButton Icon="Save" Label="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" />
-      <AppBarButton Icon="SaveLocal" Label="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" />
-      <AppBarSeparator />
-      <AppBarButton Icon="Document" Label="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
-      <AppBarButton Icon="Undo" Label="{Binding UndoLabel}" Command="{Binding UndoCommand}" />
-      <AppBarButton Icon="Redo" Label="{Binding RedoLabel}" Command="{Binding RedoCommand}" />
-    </CommandBar>
+    <StackPanel Grid.Row="0">
+      <MenuBar>
+        <MenuBarItem Title="{Binding [menu.file]}">
+          <MenuFlyoutItem Text="{Binding NewLabel}" Command="{Binding NewProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" />
+          <MenuFlyoutSeparator />
+          <MenuFlyoutItem Text="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" />
+          <MenuFlyoutItem Text="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
+          <MenuFlyoutItem Text="{Binding ExportLabel}" Command="{Binding ExportReportCommand}" />
+        </MenuBarItem>
+        <MenuBarItem Title="{Binding [menu.edit]}">
+          <MenuFlyoutItem Text="{Binding UndoLabel}" Command="{Binding UndoCommand}" />
+          <MenuFlyoutItem Text="{Binding RedoLabel}" Command="{Binding RedoCommand}" />
+        </MenuBarItem>
+        <MenuBarItem Title="Production">
+          <MenuFlyoutItem Text="Breakdown browser" Click="BreakdownBrowser_Click" />
+          <MenuFlyoutItem Text="Lock schedule" Command="{Binding LockScheduleCommand}" />
+          <MenuFlyoutItem Text="Unlock schedule" Command="{Binding UnlockScheduleCommand}" />
+        </MenuBarItem>
+      </MenuBar>
+      <CommandBar DefaultLabelPosition="Right">
+        <AppBarButton Icon="Add" Label="{Binding NewLabel}" Command="{Binding NewProjectCommand}" />
+        <AppBarButton Icon="OpenFile" Label="{Binding OpenLabel}" Command="{Binding OpenProjectCommand}" />
+        <AppBarButton Icon="Save" Label="{Binding SaveLabel}" Command="{Binding SaveProjectCommand}" />
+        <AppBarButton Icon="SaveLocal" Label="{Binding SaveAsLabel}" Command="{Binding SaveAsProjectCommand}" />
+        <AppBarSeparator />
+        <AppBarButton Icon="Document" Label="{Binding ImportLabel}" Command="{Binding ImportScriptCommand}" />
+        <AppBarButton Icon="Undo" Label="{Binding UndoLabel}" Command="{Binding UndoCommand}" />
+        <AppBarButton Icon="Redo" Label="{Binding RedoLabel}" Command="{Binding RedoCommand}" />
+      </CommandBar>
+    </StackPanel>
 
     <NavigationView x:Name="Navigation" Grid.Row="1" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
-                    PaneDisplayMode="LeftCompact" SelectionChanged="Navigation_SelectionChanged">
+                    PaneDisplayMode="LeftCompact" IsPaneOpen="{Binding IsSidebarOpen, Mode=TwoWay}"
+                    SelectionChanged="Navigation_SelectionChanged">
       <NavigationView.MenuItems>
         <NavigationViewItem Content="{Binding CalendarLabel}" Icon="Calendar" Tag="calendar" />
         <NavigationViewItem Content="{Binding StripboardLabel}" Icon="List" Tag="stripboard" />
@@ -33,7 +56,7 @@
       </NavigationView.MenuItems>
       <NavigationView.PaneFooter>
         <StackPanel Spacing="4" Margin="4,8">
-          <TextBlock Text="Recent projects" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding [ui.recent]}" FontWeight="SemiBold" />
           <ListView ItemsSource="{Binding RecentFiles}" IsItemClickEnabled="True"
                     ItemClick="RecentFiles_ItemClick" MaxHeight="180"
                     SelectionMode="None">
@@ -71,14 +94,15 @@
                     <RowDefinition Height="Auto" />
                   </Grid.RowDefinitions>
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Boneyard" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <Button Content="+ Scene" Click="AddScene_Click" />
-                    <Button Content="Copy" Command="{Binding CopySceneCommand}" />
+                    <TextBlock Text="{Binding [ui.boneyard]}" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <Button Content="{Binding [ui.scene.add]}" Click="AddScene_Click" />
+                    <Button Content="{Binding [ui.breakdown]}" Click="BreakdownBrowser_Click" />
+                    <Button Content="{Binding [ui.copy]}" Command="{Binding CopySceneCommand}" />
                   </StackPanel>
                   <StackPanel Grid.Row="1" Spacing="4" Margin="0,8">
-                    <TextBox PlaceholderText="Search title, cast or summary"
+                    <TextBox PlaceholderText="{Binding [ui.search]}"
                              Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <ComboBox Header="Sort" ItemsSource="{Binding BoneyardSorts}"
+                    <ComboBox Header="{Binding [ui.sort]}" ItemsSource="{Binding BoneyardSorts}"
                               SelectedItem="{Binding SelectedBoneyardSort, Mode=TwoWay}" />
                   </StackPanel>
                   <ListView Grid.Row="2" ItemsSource="{Binding Boneyard}" SelectionMode="Extended"
@@ -86,7 +110,8 @@
                             SelectedItem="{Binding SelectedBoneyardScene, Mode=TwoWay}">
                     <ListView.ItemTemplate>
                       <DataTemplate>
-                        <Grid Padding="4" ColumnSpacing="6" PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited">
+                        <Grid Padding="4" ColumnSpacing="6" PointerEntered="Card_PointerEntered" PointerExited="Card_PointerExited"
+                              DoubleTapped="Scene_DoubleTapped" ToolTipService.ToolTip="{Binding Summary}">
                           <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                           <StackPanel>
                             <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" />
@@ -101,17 +126,17 @@
                       </DataTemplate>
                     </ListView.ItemTemplate>
                   </ListView>
-                  <Button Grid.Row="3" Content="Send to selected day" Command="{Binding SendToDayCommand}" HorizontalAlignment="Stretch" />
+                  <Button Grid.Row="3" Content="{Binding [ui.sendToDay]}" Command="{Binding SendToDayCommand}" HorizontalAlignment="Stretch" />
                 </Grid>
               </Border>
 
               <Grid Grid.Column="1">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                  <DatePicker x:Name="RangeStart" Header="Start" />
-                  <DatePicker x:Name="RangeEnd" Header="End" />
-                  <CheckBox x:Name="ShiftSchedule" Content="Shift existing schedule" VerticalAlignment="Bottom" Margin="0,0,0,6" />
-                  <Button Content="Apply range" Click="ChangeRange_Click" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                  <DatePicker x:Name="RangeStart" Header="{Binding [ui.start]}" />
+                  <DatePicker x:Name="RangeEnd" Header="{Binding [ui.end]}" />
+                  <CheckBox x:Name="ShiftSchedule" Content="{Binding [ui.shift]}" VerticalAlignment="Bottom" Margin="0,0,0,6" />
+                  <Button Content="{Binding [ui.applyRange]}" Click="ChangeRange_Click" VerticalAlignment="Bottom" Margin="0,0,0,4" />
                 </StackPanel>
                 <ListView Grid.Row="1" ItemsSource="{Binding ShootDays}" CanDragItems="True"
                           DragItemsStarting="ShootDays_DragItemsStarting"
@@ -147,10 +172,10 @@
             <Grid>
               <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
               <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-                <TextBlock Text="Selected day stripboard" Style="{ThemeResource TitleTextBlockStyle}" />
-                <Button Content="+ Banner" Click="AddBanner_Click" />
-                <Button Content="+ Meal" Click="AddMeal_Click" />
-                <Button Content="+ Event" Click="AddEvent_Click" />
+                <TextBlock Text="{Binding [ui.stripboard]}" Style="{ThemeResource TitleTextBlockStyle}" />
+                <Button Content="{Binding [ui.banner.add]}" Click="AddBanner_Click" />
+                <Button Content="{Binding [ui.meal.add]}" Click="AddMeal_Click" />
+                <Button Content="{Binding [ui.event.add]}" Click="AddEvent_Click" />
               </StackPanel>
               <ListView Grid.Row="1" ItemsSource="{Binding SelectedDayScenes}" SelectionMode="Extended"
                         CanDragItems="True" DragItemsStarting="Stripboard_DragItemsStarting">
@@ -178,7 +203,7 @@
               <PivotItem Header="Production">
                 <ScrollViewer>
                   <StackPanel Spacing="8" MaxWidth="700" HorizontalAlignment="Left">
-                    <TextBlock Text="Production Setup" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBlock Text="{Binding [ui.productionSetup]}" Style="{ThemeResource TitleTextBlockStyle}" />
                     <TextBox Header="Company" Text="{Binding ProductionDraft.CompanyName, Mode=TwoWay}" />
                     <TextBox Header="Director" Text="{Binding ProductionDraft.DirectorName, Mode=TwoWay}" />
                     <TextBox Header="Director phone" Text="{Binding ProductionDraft.DirectorPhone, Mode=TwoWay}" />
@@ -188,7 +213,7 @@
                     <TextBox Header="AD phone" Text="{Binding ProductionDraft.AdPhone, Mode=TwoWay}" />
                     <TextBox Header="Contact" Text="{Binding ProductionDraft.ContactNumber, Mode=TwoWay}" />
                     <TextBox Header="Default lunch" Text="{Binding ProductionDraft.DefaultLunchTime, Mode=TwoWay}" />
-                    <Button Content="Save production" Command="{Binding SaveProductionCommand}" HorizontalAlignment="Left" />
+                    <Button Content="{Binding [ui.saveProduction]}" Command="{Binding SaveProductionCommand}" HorizontalAlignment="Left" />
                   </StackPanel>
                 </ScrollViewer>
               </PivotItem>
@@ -244,12 +269,12 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                   <StackPanel Spacing="8">
                     <TextBlock Text="Conflicts" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <ListView ItemsSource="{Binding CurrentConflicts}"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding CharacterName}" /></DataTemplate></ListView.ItemTemplate></ListView>
+                    <ListView ItemsSource="{Binding CurrentConflicts}"><ListView.ItemTemplate><DataTemplate><Button Content="{Binding DisplayString}" Tag="{Binding}" Click="JumpToConflict_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" /></DataTemplate></ListView.ItemTemplate></ListView>
                   </StackPanel>
                   <StackPanel Grid.Column="1" Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Lock baseline" Command="{Binding LockScheduleCommand}" /><Button Content="Unlock" Command="{Binding UnlockScheduleCommand}" /></StackPanel>
                     <TextBlock Text="Schedule lock changes" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <ListView ItemsSource="{Binding ScheduleLockChanges}"><ListView.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding ActorDisplayName}" FontWeight="SemiBold" /><TextBlock Text="Working days changed" Opacity="0.7" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                    <ListView ItemsSource="{Binding ScheduleLockChanges}"><ListView.ItemTemplate><DataTemplate><Button Tag="{Binding}" Click="JumpToLockChange_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"><StackPanel><TextBlock Text="{Binding ActorDisplayName}" FontWeight="SemiBold" /><TextBlock Text="{Binding DisplayString}" Opacity="0.7" TextWrapping="Wrap" /></StackPanel></Button></DataTemplate></ListView.ItemTemplate></ListView>
                   </StackPanel>
                 </Grid>
               </PivotItem>
@@ -258,7 +283,7 @@
 
           <PivotItem>
             <StackPanel Spacing="16" MaxWidth="520" HorizontalAlignment="Left">
-              <TextBlock Text="Export report" Style="{ThemeResource TitleTextBlockStyle}" />
+              <TextBlock Text="{Binding [ui.exportReport]}" Style="{ThemeResource TitleTextBlockStyle}" />
               <ComboBox ItemsSource="{Binding ReportKinds}" SelectedItem="{Binding SelectedReportKind, Mode=TwoWay}" HorizontalAlignment="Stretch" />
               <Button Content="{Binding ExportLabel}" Command="{Binding ExportReportCommand}" HorizontalAlignment="Left" />
             </StackPanel>
@@ -273,6 +298,8 @@
               <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" HorizontalAlignment="Stretch" />
               <TextBlock Text="{Binding ColorModeLabel}" />
               <ComboBox ItemsSource="{Binding ColorModes}" SelectedItem="{Binding SelectedColorMode, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+              <CheckBox Content="{Binding SidebarLabel}" IsChecked="{Binding IsSidebarOpen, Mode=TwoWay}" />
+              <CheckBox Content="{Binding HoldDaysLabel}" IsChecked="{Binding IncludeHoldDays, Mode=TwoWay}" />
               <Border Height="8" CornerRadius="4" Background="{Binding AccentBrush}" />
             </StackPanel>
           </PivotItem>

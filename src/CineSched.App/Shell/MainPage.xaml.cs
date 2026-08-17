@@ -1,5 +1,7 @@
 using CineSched.Core.Features.Production;
 using CineSched.Core.Features.Scenes;
+using CineSched.Core.Features.Conflicts;
+using CineSched.Core.Features.ScheduleLock;
 using CineSched.Core.Features.Stripboard;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
@@ -168,7 +170,60 @@ public sealed partial class MainPage : Page
         if (sender is Button { Tag: ShootDay day }) _viewModel.ToggleBlackout(day, matchingWeekday: true);
     }
 
+    private void JumpToConflict_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is Button { Tag: ScheduleConflict conflict })
+            SelectCalendarDay(conflict.ShootDayId);
+    }
+
+    private void JumpToLockChange_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is not Button { Tag: ScheduleLockChange change }) return;
+        var date = change.AddedDays.Concat(change.RemovedDays).FirstOrDefault();
+        var day = _viewModel.ShootDays.FirstOrDefault(candidate => candidate.Date.Date == date.Date);
+        if (day is not null) SelectCalendarDay(day.Id);
+    }
+
+    private void SelectCalendarDay(Guid dayId)
+    {
+        var day = _viewModel.ShootDays.FirstOrDefault(candidate => candidate.Id == dayId);
+        if (day is null) return;
+        _viewModel.SelectedDay = day;
+        Navigation.SelectedItem = Navigation.MenuItems[0];
+        Workspace.SelectedIndex = 0;
+    }
+
     private async void AddScene_Click(object sender, RoutedEventArgs args) => await ShowSceneEditorAsync(null);
+
+    private async void Scene_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs args)
+    {
+        if (sender is FrameworkElement { DataContext: Scene scene }) await ShowSceneEditorAsync(scene);
+    }
+
+    private async void BreakdownBrowser_Click(object sender, RoutedEventArgs args)
+    {
+        var scenes = _viewModel.GetScriptOrder();
+        if (scenes.Count == 0)
+        {
+            await _dialogs.ShowErrorAsync("Breakdown browser", "There are no scenes in the project.");
+            return;
+        }
+
+        var list = new ListView
+        {
+            ItemsSource = scenes,
+            DisplayMemberPath = nameof(Scene.DisplayTitle),
+            SelectionMode = ListViewSelectionMode.Single,
+            SelectedIndex = 0,
+            Width = 520,
+            MaxHeight = 580
+        };
+        if (await ShowEditorAsync("Breakdown browser — script order", list, "Edit selected") == ContentDialogResult.Primary &&
+            list.SelectedItem is Scene scene)
+        {
+            await ShowSceneEditorAsync(scene);
+        }
+    }
 
     private async void EditScene_Click(object sender, RoutedEventArgs args)
     {

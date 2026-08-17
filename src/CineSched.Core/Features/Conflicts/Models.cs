@@ -6,4 +6,9 @@ public sealed record ScheduleConflict(
     DateTimeOffset Date,
     string CharacterName,
     string ActorName,
-    bool IsBlackout);
+    bool IsBlackout)
+{
+    public string DisplayString => IsBlackout
+        ? $"{Date:yyyy-MM-dd}: blackout day"
+        : $"{Date:yyyy-MM-dd}: {ActorName} — {CharacterName}";
+}

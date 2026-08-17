@@ -9,4 +9,11 @@ public sealed class ScheduleLockData
 public sealed record ScheduleLockChange(
     string ActorDisplayName,
     IReadOnlyList<DateTimeOffset> AddedDays,
-    IReadOnlyList<DateTimeOffset> RemovedDays);
+    IReadOnlyList<DateTimeOffset> RemovedDays)
+{
+    public string DisplayString => string.Join(" · ", new[]
+    {
+        AddedDays.Count == 0 ? null : $"+ {string.Join(", ", AddedDays.Select(day => day.ToString("yyyy-MM-dd")))}",
+        RemovedDays.Count == 0 ? null : $"− {string.Join(", ", RemovedDays.Select(day => day.ToString("yyyy-MM-dd")))}"
+    }.Where(value => value is not null));
+}

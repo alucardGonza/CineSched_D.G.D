@@ -13,6 +13,10 @@ public sealed class SettingsService
     public AppSettings Update(AppSettings settings)
     {
         _current = settings;
+        CultureInfo.DefaultThreadCurrentCulture = Culture;
+        CultureInfo.DefaultThreadCurrentUICulture = Culture;
+        CultureInfo.CurrentCulture = Culture;
+        CultureInfo.CurrentUICulture = Culture;
         Changed?.Invoke(this, settings);
         return settings;
     }
@@ -53,6 +57,29 @@ public sealed class SettingsService
             ["settings.language"] = ("Language", "Idioma"),
             ["settings.theme"] = ("Theme", "Tema"),
             ["settings.colorMode"] = ("Color mode", "Modo de color"),
-            ["reports.export"] = ("Export PDF", "Exportar PDF")
+            ["settings.sidebar"] = ("Keep sidebar open", "Mantener barra lateral abierta"),
+            ["settings.holdDays"] = ("Include hold days in DOOD", "Incluir días hold en DOOD"),
+            ["reports.export"] = ("Export PDF", "Exportar PDF"),
+            ["menu.file"] = ("File", "Archivo"),
+            ["menu.edit"] = ("Edit", "Editar"),
+            ["ui.recent"] = ("Recent projects", "Proyectos recientes"),
+            ["ui.boneyard"] = ("Boneyard", "Sin programar"),
+            ["ui.scene.add"] = ("+ Scene", "+ Escena"),
+            ["ui.breakdown"] = ("Breakdown", "Desglose"),
+            ["ui.copy"] = ("Copy", "Copiar"),
+            ["ui.search"] = ("Search title, cast or summary", "Buscar título, reparto o resumen"),
+            ["ui.sort"] = ("Sort", "Ordenar"),
+            ["ui.sendToDay"] = ("Send to selected day", "Enviar al día seleccionado"),
+            ["ui.start"] = ("Start", "Inicio"),
+            ["ui.end"] = ("End", "Fin"),
+            ["ui.shift"] = ("Shift existing schedule", "Desplazar programación existente"),
+            ["ui.applyRange"] = ("Apply range", "Aplicar rango"),
+            ["ui.stripboard"] = ("Selected day stripboard", "Tiras del día seleccionado"),
+            ["ui.banner.add"] = ("+ Banner", "+ Aviso"),
+            ["ui.meal.add"] = ("+ Meal", "+ Comida"),
+            ["ui.event.add"] = ("+ Event", "+ Evento"),
+            ["ui.productionSetup"] = ("Production Setup", "Configuración de producción"),
+            ["ui.saveProduction"] = ("Save production", "Guardar producción"),
+            ["ui.exportReport"] = ("Export report", "Exportar reporte")
         };
 }
