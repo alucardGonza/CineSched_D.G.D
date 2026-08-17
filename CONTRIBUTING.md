@@ -1,89 +1,68 @@
 # Contributing to CineSched
 
-Thanks for your interest in contributing. CineSched is a gift to the film production community and welcomes contributions of all kinds — bug fixes, features, documentation, and ports to other platforms.
+Thanks for helping improve CineSched. Bug fixes, features, documentation, accessibility improvements, packaging work, and platform validation are welcome.
 
-## Getting Started
+## Requirements
 
-### Requirements
-- macOS 13.0 (Ventura) or later
-- Xcode 14.0 or later
+- The .NET SDK selected by `global.json`
+- Git
+- Platform tooling required by the target you intend to build or package
 
-### Setup
-1. Fork and clone the repository
-2. Open `CineSched.xcodeproj` in Xcode
-3. Build and run with ⌘R
+## Setup
 
-## Project Structure
+1. Fork and clone the repository.
+2. Create a focused branch from an up-to-date `main`.
+3. Restore, build, test, and run the desktop application:
 
-The codebase is organized into focused single-purpose files. Before diving in, it's worth spending a few minutes reading through them:
-
-```
-CineSched/
-├── CineSchedApp.swift         # App entry point
-├── Models.swift               # Core data types: Scene, ShootDay, ProjectData
-├── Parsers.swift              # Page duration and time input parsing
-├── Formatting.swift           # Shared formatting helpers
-├── FinalDraftParser.swift     # .fdx script file parsing
-├── PDFExporter.swift          # PDF generation
-├── ProjectStore.swift         # Save, load, and auto-save logic
-├── ContentView.swift          # Root view and app state
-├── CalendarView.swift         # Calendar grid and drag-and-drop
-├── SceneEditSheet.swift       # Scene editing modal
-└── NewSceneInputView.swift    # Add scene form
+```powershell
+dotnet restore CineSched.slnx --locked-mode
+dotnet build CineSched.slnx -c Release --no-restore -warnaserror
+dotnet test CineSched.slnx -c Release --no-build
+dotnet run --project src/CineSched.App/CineSched.App.csproj -f net10.0-desktop
 ```
 
-## How to Contribute
+## Architecture
 
-### Reporting Bugs
-Open an issue with:
-- macOS version and Xcode version
-- Steps to reproduce
-- What you expected vs. what happened
-- Console output if relevant
+- `src/CineSched.Core/Features/<Feature>/` contains one `Models.cs` and one cohesive `<Feature>Service.cs` per vertical slice.
+- `src/CineSched.App/` contains the Uno UI, view model, lifecycle, native dialogs, clipboard, preferences, and recent-file integrations.
+- `tests/CineSched.Tests/` is the only test project and contains unit tests plus a small number of valuable integration pipelines.
+- Core must not reference Uno, XAML, ports, adapters, or handler classes.
 
-### Submitting a Pull Request
-1. Create a branch from `main` with a descriptive name (e.g. `feature/call-sheets` or `fix/pdf-grid-lines`)
-2. Keep changes focused — one feature or fix per PR
-3. Follow the existing code style (each file has a single clear responsibility)
-4. Test on macOS 13+ before submitting
-5. Update `CHANGELOG.md` under an `[Unreleased]` section
+Read `ARCHITECTURE.md`, `SPEC.md`, and `MIGRATION-PLAN.md` before making structural or compatibility changes.
 
-### Code Style
-- Swift standard conventions throughout
-- `// MARK: -` sections to organize code within files
-- New features should live in their own file where it makes sense
-- Avoid adding logic to `ContentView.swift` — use extensions or new files
+## Pull requests
 
-## Project File Format
+1. Keep each pull request focused on one feature or fix.
+2. Use descriptive commits and explain behavior, impact, and validation in the PR.
+3. Add or update tests for business behavior and regressions.
+4. Run the Release build and complete test suite before pushing.
+5. Perform manual UI validation on every platform affected by a presentation change.
+6. Update documentation and `CHANGELOG.md` when user-visible behavior changes.
+7. Open a draft PR while work or platform validation remains incomplete.
 
-CineSched saves projects as standard `.json` files. The format is intentionally simple and human-readable. Any contributions that touch the data model should:
-- Maintain backwards compatibility with existing save files
-- Use optional fields with sensible defaults for any new properties
-- Document the migration path in the PR description
+## Project compatibility
 
-The JSON format is also designed to be portable — a Windows or Linux version of CineSched should be able to read and write the same files.
+CineSched saves `.cinesched` files as portable JSON. Changes to the wire model must:
 
-## Windows / Cross-Platform Port
+- Continue opening the compatibility fixtures in `tests/CineSched.Tests/TestAssets/Projects/`.
+- Use optional fields and safe defaults for newly introduced data.
+- Preserve stable IDs, dates, enum wire values, and fields unknown to the UI where applicable.
+- Document migrations and compatibility impact in the pull request.
 
-A Windows version that reads and writes the same `.json` format would be a hugely valuable contribution to the film community. If you're a Windows developer interested in building one, please open an issue to discuss it — the data model is stable and well-documented in `Models.swift`, and the project maintainer is happy to help ensure JSON compatibility.
+The `legacy-*` fixtures are intentionally retained: they are test inputs, not active application code.
 
-Suggested frameworks for a Windows port:
-- **Electron** — web technologies, runs identically on Mac and Windows
-- **Flutter** — single codebase for Mac and Windows desktop
-- **Avalonia** — declarative .NET UI, closest in style to SwiftUI
+## Code style
 
-## Feature Ideas
+- Follow the repository's .NET analyzers and nullable-reference settings.
+- Keep UI-independent behavior in the appropriate Core feature service.
+- Keep the UI layer focused on presentation and native desktop integration.
+- Avoid introducing additional projects, architectural layers, or per-operation handlers without an accepted architecture change.
+- Treat compiler warnings as errors in verification builds.
 
-Some areas where contributions would be particularly welcome:
+## Reporting bugs
 
-- [ ] Call sheets — per-day PDF with cast, crew, location, and scene breakdown
-- [ ] Strip board view — vertical scene list sortable by location, cast, or day/night
-- [ ] Cast conflict detection — flag days where the same actor appears in multiple scenes
-- [ ] Multi-select scenes for batch editing
-- [ ] iCloud sync
-- [ ] Location color coding on the calendar
-- [ ] CSV / Excel export
+Include the operating system, .NET SDK version, build/runtime target, steps to reproduce, expected and actual behavior, relevant logs, and screenshots for visual defects. Never attach production data or secrets.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the GNU General Public License v3. This means any modified versions of CineSched — including ports to other platforms — must also be released as open source under the same license.
+By contributing, you agree that your contributions are licensed under the GNU General Public License v3.

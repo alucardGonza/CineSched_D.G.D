@@ -22,7 +22,7 @@ Si una implementación contradice `SPEC.md`, la implementación es incorrecta. S
 - Persistencia: documentos JSON manuales y autosave serializado en `UserDefaults`.
 - Arquitectura actual: estado principal concentrado en `ContentView`, extensiones de operaciones y archivos Swift separados por vista, parser o exportador.
 - Pruebas automatizadas: no existen en el repositorio actual.
-- Proyecto Xcode: el README lo menciona, pero no está incluido en el repositorio; el código Swift y la aplicación compilada son la referencia disponible.
+- Referencia histórica: el tag `v4.5.0` conserva el código Swift y la aplicación compilada usados para levantar este inventario; esos artefactos ya no forman parte del árbol activo posterior a la migración.
 
 ### Restricciones relevantes
 
