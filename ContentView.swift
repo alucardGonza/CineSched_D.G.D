@@ -1249,36 +1249,89 @@ struct ContentView: View {
     // MARK: - Calendar update (merge vs shift)
 
     private func updateShootDays(from newStart: Date, to newEnd: Date) {
-        let cal            = Calendar.current
-        let oldStart       = shootDays.first?.date ?? newStart
-        let normOldStart   = cal.startOfDay(for: oldStart)
-        let normNewStart   = cal.startOfDay(for: newStart)
-        let normNewEnd     = cal.startOfDay(for: newEnd)
-        let dayOffset      = cal.dateComponents([.day], from: normOldStart, to: normNewStart).day ?? 0
+        let cal          = Calendar.current
+        let normNewStart = cal.startOfDay(for: newStart)
+        let normNewEnd   = cal.startOfDay(for: newEnd)
 
-        let existingMap: [Date: ShootDay] = shootDays.reduce(into: [:]) {
-            $0[cal.startOfDay(for: $1.date)] = $1
+        // 1. Separate calendar events (which stay anchored to their real date) from script scenes
+        var calendarEventsByDate: [Date: [Scene]] = [:]
+        var scriptScenesByDate: [Date: [Scene]] = [:]
+        var allExistingScriptScenes: [UUID: Scene] = [:]
+
+        for day in shootDays {
+            let dayNorm = cal.startOfDay(for: day.date)
+            let events = day.scenes.filter { $0.isCalendarEvent }
+            let scripts = day.scenes.filter { !$0.isCalendarEvent }
+            if !events.isEmpty {
+                calendarEventsByDate[dayNorm, default: []].append(contentsOf: events)
+            }
+            if !scripts.isEmpty {
+                scriptScenesByDate[dayNorm, default: []].append(contentsOf: scripts)
+                for s in scripts { allExistingScriptScenes[s.id] = s }
+            }
         }
 
-        var updated: [ShootDay] = []
+        // 2. Find old shooting start date (from actual script scenes or previous start)
+        let sortedScriptDates = scriptScenesByDate.keys.sorted()
+        let oldScriptStart = sortedScriptDates.first ?? normNewStart
+        let dayOffset = cal.dateComponents([.day], from: oldScriptStart, to: normNewStart).day ?? 0
+
+        var updatedDays: [ShootDay] = []
+        var scheduledSceneIDs: Set<UUID> = []
+
         var current = normNewStart
         while current <= normNewEnd {
-            let day: ShootDay
+            var dayScenes: [Scene] = []
+
+            // Add script scenes (shifted or merged)
             if isShiftModeEnabled {
-                if let original = cal.date(byAdding: .day, value: -dayOffset, to: current),
-                   let old = existingMap[original] {
-                    day = ShootDay(date: current, scenes: old.scenes)
-                } else {
-                    day = ShootDay(date: current)
+                if let sourceDate = cal.date(byAdding: .day, value: -dayOffset, to: current),
+                   let sourceScenes = scriptScenesByDate[cal.startOfDay(for: sourceDate)] {
+                    dayScenes.append(contentsOf: sourceScenes)
                 }
             } else {
-                day = existingMap[current] ?? ShootDay(date: current)
+                if let existing = scriptScenesByDate[current] {
+                    dayScenes.append(contentsOf: existing)
+                }
             }
-            updated.append(day)
+
+            // Add anchored calendar events for this date
+            if let events = calendarEventsByDate[current] {
+                dayScenes.append(contentsOf: events)
+            }
+
+            for s in dayScenes where !s.isCalendarEvent {
+                scheduledSceneIDs.insert(s.id)
+            }
+
+            updatedDays.append(ShootDay(date: current, scenes: dayScenes))
             guard let next = cal.date(byAdding: .day, value: 1, to: current) else { break }
             current = next
         }
-        shootDays = updated
+
+        // 3. Preserve calendar events that exist outside the new shoot range
+        for (eventDate, events) in calendarEventsByDate {
+            if eventDate < normNewStart || eventDate > normNewEnd {
+                if !updatedDays.contains(where: { cal.isDate($0.date, inSameDayAs: eventDate) }) {
+                    updatedDays.append(ShootDay(date: eventDate, scenes: events))
+                }
+            }
+        }
+
+        // 4. ANTI-LOSS SAFETY NET: Any script scenes that didn't fit into the new schedule
+        // are returned to allScenes (Boneyard) so they are NEVER permanently lost!
+        for (sceneId, scene) in allExistingScriptScenes {
+            if !scheduledSceneIDs.contains(sceneId) && !allScenes.contains(where: { $0.id == sceneId }) {
+                allScenes.append(scene)
+            }
+        }
+
+        updatedDays.sort { $0.date < $1.date }
+        shootDays = updatedDays
+        recomputeSortedScenes()
+        pruneSelection()
+        recomputeConflicts()
+        recomputeScheduleLockChanges()
         markDirty()
     }
 }

@@ -648,6 +648,14 @@ struct CompactMonthCalendarView: View {
                         editScene(dayIndex: dIdx, sceneIndex: sIdx, scene: scene, dayId: day.id)
                     }
                 },
+                onRemoveScene: { scene in
+                    removeFromDay(scene, dayId: day.id)
+                    if let updated = shootDays.first(where: { $0.id == day.id }) {
+                        inspectingDay = updated
+                    } else {
+                        inspectingDay = nil
+                    }
+                },
                 onAddCalendarEvent: {
                     inspectingDay = nil
                     addingEventForDayId = day.id
@@ -763,6 +771,27 @@ struct CompactMonthCalendarView: View {
         .onTapGesture(count: 2) {
             createAndAddEvent(for: date)
         }
+        .onDrop(of: [UTType.text.identifier], delegate: CombinedDayDropDelegate(
+            dayId: UUID(),
+            scenes: [],
+            dropTargetDayId: $dropTargetDayId,
+            dropTargetPosition: $dropTargetPosition,
+            dayDropTargetId: $dayDropTargetId,
+            draggingDayId: $draggingDayId,
+            onSceneDrop: { sceneId in
+                onBeforeSceneChange()
+                var targetDay: ShootDay
+                if let existing = shootDays.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+                    targetDay = existing
+                } else {
+                    targetDay = ShootDay(date: date)
+                    shootDays.append(targetDay)
+                    shootDays.sort { $0.date < $1.date }
+                }
+                handleSceneDrop(sceneId: sceneId, targetDayId: targetDay.id, targetPosition: targetDay.scenes.count)
+            },
+            onDayDrop: { _ in }
+        ))
         .contextMenu {
             Button(L("Add Calendar Event")) {
                 createAndAddEvent(for: date)
@@ -949,32 +978,43 @@ struct CompactMonthCalendarView: View {
 
     private func handleSceneDrop(sceneId: UUID, targetDayId: UUID, targetPosition: Int) {
         onBeforeSceneChange()
-        guard let sourceDayIndex = shootDays.firstIndex(where: { $0.scenes.contains(where: { $0.id == sceneId }) }),
-              let targetDayIndex = shootDays.firstIndex(where: { $0.id == targetDayId }) else { return }
+        guard let targetDayIndex = shootDays.firstIndex(where: { $0.id == targetDayId }) else { return }
 
         let idsToMove: [UUID] = selectedSceneIDs.contains(sceneId) && selectedSceneIDs.count > 1
             ? Array(selectedSceneIDs)
             : [sceneId]
 
-        var scenesToMove: [Scene] = []
-        if sourceDayIndex == targetDayIndex {
-            let dayScenes = shootDays[sourceDayIndex].scenes
-            let movingSet = Set(idsToMove)
-            scenesToMove = dayScenes.filter { movingSet.contains($0.id) }
-            var remaining = dayScenes.filter { !movingSet.contains($0.id) }
-            let clampedPos = min(targetPosition, remaining.count)
-            remaining.insert(contentsOf: scenesToMove, at: clampedPos)
-            shootDays[sourceDayIndex].scenes = remaining
-        } else {
-            for dIdx in 0..<shootDays.count {
-                let matches = shootDays[dIdx].scenes.filter { idsToMove.contains($0.id) }
-                scenesToMove.append(contentsOf: matches)
-                shootDays[dIdx].scenes.removeAll { idsToMove.contains($0.id) }
+        if let sourceDayIndex = shootDays.firstIndex(where: { $0.scenes.contains(where: { $0.id == sceneId }) }) {
+            // Dragged from another shoot day or reordering
+            var scenesToMove: [Scene] = []
+            if sourceDayIndex == targetDayIndex {
+                let dayScenes = shootDays[sourceDayIndex].scenes
+                let movingSet = Set(idsToMove)
+                scenesToMove = dayScenes.filter { movingSet.contains($0.id) }
+                var remaining = dayScenes.filter { !movingSet.contains($0.id) }
+                let clampedPos = min(targetPosition, remaining.count)
+                remaining.insert(contentsOf: scenesToMove, at: clampedPos)
+                shootDays[sourceDayIndex].scenes = remaining
+            } else {
+                for dIdx in 0..<shootDays.count {
+                    let matches = shootDays[dIdx].scenes.filter { idsToMove.contains($0.id) }
+                    scenesToMove.append(contentsOf: matches)
+                    shootDays[dIdx].scenes.removeAll { idsToMove.contains($0.id) }
+                }
+                let clampedPos = min(targetPosition, shootDays[targetDayIndex].scenes.count)
+                shootDays[targetDayIndex].scenes.insert(contentsOf: scenesToMove, at: clampedPos)
             }
-            let clampedPos = min(targetPosition, shootDays[targetDayIndex].scenes.count)
-            shootDays[targetDayIndex].scenes.insert(contentsOf: scenesToMove, at: clampedPos)
+            onSceneChanged()
+        } else {
+            // Dragged from BONEYARD (allScenes)!
+            let scenesFromBoneyard = allScenes.filter { idsToMove.contains($0.id) }
+            if !scenesFromBoneyard.isEmpty {
+                allScenes.removeAll { idsToMove.contains($0.id) }
+                let clampedPos = min(targetPosition, shootDays[targetDayIndex].scenes.count)
+                shootDays[targetDayIndex].scenes.insert(contentsOf: scenesFromBoneyard, at: clampedPos)
+                onSceneChanged()
+            }
         }
-        onSceneChanged()
     }
 
     private func handleDayRearrange(sourceDayId: UUID, targetDayId: UUID) {
@@ -1155,11 +1195,17 @@ struct SceneCardView: View {
         .onTapGesture { onSelect() }
         .simultaneousGesture(TapGesture(count: 2).onEnded { onEdit() })
         .contextMenu {
-            Button("Edit Scene") { onEdit() }
-            Button("Duplicate Scene") { onDuplicate() }
-            Button("Move to Day...") { onSendToDay() }
-            Divider()
-            Button("Remove from Day") { onRemove() }
+            if scene.isCalendarEvent {
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Editar Evento" : "Edit Event") { onEdit() }
+                Divider()
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Eliminar Evento" : "Delete Event") { onRemove() }
+            } else {
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Editar Escena" : "Edit Scene") { onEdit() }
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Duplicar Escena" : "Duplicate Scene") { onDuplicate() }
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Mover a Día..." : "Move to Day...") { onSendToDay() }
+                Divider()
+                Button(LocalizationManager.shared.currentLanguage == .spanish ? "Quitar del Día" : "Remove from Day") { onRemove() }
+            }
         }
         .onDrag {
             onDragStart()

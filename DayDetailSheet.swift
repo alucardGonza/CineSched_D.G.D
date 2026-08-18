@@ -14,6 +14,7 @@ struct DayDetailSheet: View {
     @Binding var isPresented: Bool
 
     let onEditScene: (Scene) -> Void
+    let onRemoveScene: (Scene) -> Void
     let onAddCalendarEvent: () -> Void
     let onOpenCallSheet: () -> Void
     let onExportCallSheetPDF: () -> Void
@@ -270,8 +271,20 @@ struct DayDetailSheet: View {
                     } label: {
                         Image(systemName: "pencil")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .help(isSpanish ? "Editar Evento" : "Edit Event")
+
+                    Button {
+                        onRemoveScene(event)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .help(isSpanish ? "Eliminar Evento" : "Delete Event")
                 }
                 .padding(10)
                 .background(Color(hex: event.bannerColorHex.isEmpty ? "6366F1" : event.bannerColorHex).opacity(0.12))

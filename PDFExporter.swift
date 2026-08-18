@@ -435,8 +435,17 @@ class PDFExporter {
         }
 
         // Draw Weeks Grid
+        let breakdownHeight: CGFloat = 78
+        let breakdownRect = CGRect(
+            x: contentRect.minX,
+            y: contentRect.minY,
+            width: contentRect.width,
+            height: breakdownHeight
+        )
+
         let gridTop = weekdayBarRect.minY - 4
-        let gridHeight = gridTop - contentRect.minY
+        let gridBottom = breakdownRect.maxY + 6
+        let gridHeight = gridTop - gridBottom
         let numWeeks = max(CGFloat(monthWeeks.count), 1)
         let rowHeight = gridHeight / numWeeks
 
@@ -459,6 +468,15 @@ class PDFExporter {
             }
         }
 
+        // Draw Bottom Activity & Shoot Breakdown Legend
+        drawMonthBreakdownLegend(
+            in: breakdownRect,
+            month: month,
+            shootDays: shootDays,
+            dayNumbers: dayNumbers,
+            isSpanish: isSpanish
+        )
+
         NSGraphicsContext.restoreGraphicsState()
         context.endPDFPage()
         context.closePDF()
@@ -474,7 +492,7 @@ class PDFExporter {
         isCurrentMonth: Bool
     ) {
         let path = NSBezierPath(rect: rect)
-        let isShoot = shootDay != nil && !shootDay!.isBlackout && (dayNumber != nil || !shootDay!.scenes.isEmpty)
+        let isShoot = shootDay != nil && !shootDay!.isBlackout && (dayNumber != nil || !shootDay!.scenes.filter { !$0.isCalendarEvent }.isEmpty)
 
         if isShoot {
             NSColor(red: 0.93, green: 0.96, blue: 1.0, alpha: 1.0).setFill()
@@ -493,74 +511,172 @@ class PDFExporter {
 
         let cal = Calendar.current
         let dayDigit = cal.component(.day, from: date)
-        let padding: CGFloat = 4
+        let padding: CGFloat = 3
         let inner = rect.insetBy(dx: padding, dy: padding)
 
         // Day Number Header
         let dayNumAttr: [NSAttributedString.Key: Any] = [
-            .font: NSFont.boldSystemFont(ofSize: 9),
+            .font: NSFont.boldSystemFont(ofSize: 8.5),
             .foregroundColor: isCurrentMonth ? NSColor.black : NSColor.lightGray
         ]
         NSAttributedString(string: "\(dayDigit)", attributes: dayNumAttr)
-            .draw(at: CGPoint(x: inner.minX, y: inner.maxY - 12))
+            .draw(at: CGPoint(x: inner.minX, y: inner.maxY - 11))
 
         // Shoot Day Badge
         if let dayNumber = dayNumber, isShoot {
             let para = NSMutableParagraphStyle(); para.alignment = .right
             let badgeAttr: [NSAttributedString.Key: Any] = [
-                .font: NSFont.boldSystemFont(ofSize: 8),
+                .font: NSFont.boldSystemFont(ofSize: 7.5),
                 .foregroundColor: NSColor(red: 0.1, green: 0.35, blue: 0.8, alpha: 1.0),
                 .paragraphStyle: para
             ]
             let badgeText = LocalizationManager.shared.currentLanguage == .spanish ? "DÍA #\(dayNumber)" : "DAY #\(dayNumber)"
             NSAttributedString(string: badgeText, attributes: badgeAttr)
-                .draw(in: CGRect(x: inner.minX, y: inner.maxY - 12, width: inner.width, height: 12))
+                .draw(in: CGRect(x: inner.minX, y: inner.maxY - 11, width: inner.width, height: 11))
         }
 
         // Scenes and Calendar Events list
         if let day = shootDay {
-            let boxHeight: CGFloat = 11
-            var yOff: CGFloat = 15
+            let boxHeight: CGFloat = 10.5
+            var yOff: CGFloat = 13.5
             let pStyle = NSMutableParagraphStyle()
             pStyle.lineBreakMode = .byTruncatingTail
 
             for scene in day.scenes {
-                guard inner.maxY - yOff - boxHeight >= inner.minY + 8 else { break }
+                guard inner.maxY - yOff - boxHeight >= inner.minY + 4 else { break }
 
                 let bRect = CGRect(x: inner.minX, y: inner.maxY - yOff - boxHeight, width: inner.width, height: boxHeight)
                 let bPath = NSBezierPath(roundedRect: bRect, xRadius: 2, yRadius: 2)
 
                 if scene.isCalendarEvent {
                     let evColor = NSColor(hexString: scene.bannerColorHex.isEmpty ? "6366F1" : scene.bannerColorHex)
-                    evColor.setFill()
+                    evColor.withAlphaComponent(0.2).setFill()
                     bPath.fill()
+                    evColor.withAlphaComponent(0.7).setStroke()
+                    bPath.lineWidth = 0.5
+                    bPath.stroke()
 
                     let evAttr: [NSAttributedString.Key: Any] = [
-                        .font: NSFont.boldSystemFont(ofSize: 7.5),
-                        .foregroundColor: NSColor.white,
+                        .font: NSFont.boldSystemFont(ofSize: 6.8),
+                        .foregroundColor: evColor,
                         .paragraphStyle: pStyle
                     ]
-                    let timePrefix = scene.customStartTime.isEmpty ? "" : "[\(scene.customStartTime)] "
+                    let timePrefix = scene.customStartTime.isEmpty ? "" : "\(scene.customStartTime) · "
                     NSAttributedString(string: "\(timePrefix)\(scene.title)", attributes: evAttr)
                         .draw(in: bRect.insetBy(dx: 2, dy: 1))
                 } else if !scene.isBanner {
-                    (scene.dayNightType == .night ? NSColor(white: 0.88, alpha: 1.0) : NSColor.white).setFill()
+                    (scene.dayNightType == .night ? NSColor(red: 0.88, green: 0.92, blue: 0.98, alpha: 1.0) : NSColor.white).setFill()
                     bPath.fill()
                     NSColor(white: 0.75, alpha: 1.0).setStroke()
                     bPath.lineWidth = 0.5
                     bPath.stroke()
 
                     let scAttr: [NSAttributedString.Key: Any] = [
-                        .font: NSFont.systemFont(ofSize: 7.5),
+                        .font: NSFont.systemFont(ofSize: 6.8),
                         .foregroundColor: NSColor.black,
                         .paragraphStyle: pStyle
                     ]
                     let numPrefix = scene.sceneNumber.isEmpty ? "" : "\(scene.sceneNumber). "
-                    NSAttributedString(string: "\(numPrefix)\(scene.title)", attributes: scAttr)
+                    let durStr = scene.duration > 0 ? " (\(formattedEighths(scene.duration)))" : ""
+                    NSAttributedString(string: "\(numPrefix)\(scene.title)\(durStr)", attributes: scAttr)
                         .draw(in: bRect.insetBy(dx: 2, dy: 1))
                 }
                 yOff += boxHeight + 1.5
             }
+        }
+    }
+
+    private static func drawMonthBreakdownLegend(
+        in rect: CGRect,
+        month: Date,
+        shootDays: [ShootDay],
+        dayNumbers: [UUID: Int],
+        isSpanish: Bool
+    ) {
+        let cal = Calendar.current
+        let bgPath = NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4)
+        NSColor(white: 0.96, alpha: 1.0).setFill()
+        bgPath.fill()
+        NSColor(white: 0.82, alpha: 1.0).setStroke()
+        bgPath.lineWidth = 0.5
+        bgPath.stroke()
+
+        let titleRect = CGRect(x: rect.minX + 8, y: rect.maxY - 15, width: rect.width - 16, height: 13)
+        let headerAttr: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: 7.8),
+            .foregroundColor: NSColor(white: 0.25, alpha: 1.0)
+        ]
+        let headerTitle = isSpanish
+            ? "DESGLOSE DE ACTIVIDADES Y PLAN DE RODAJE DEL MES"
+            : "MONTHLY SHOOT & ACTIVITY BREAKDOWN"
+        NSAttributedString(string: headerTitle, attributes: headerAttr).draw(in: titleRect)
+
+        // Find days in this month with content
+        let activeDays = shootDays.filter { day in
+            cal.isDate(day.date, equalTo: month, toGranularity: .month) && !day.scenes.isEmpty
+        }.sorted { $0.date < $1.date }
+
+        guard !activeDays.isEmpty else {
+            let emptyAttr: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 7.5),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]
+            let emptyMsg = isSpanish ? "No hay actividades ni rodaje programados para este mes." : "No activities or shooting scheduled for this month."
+            NSAttributedString(string: emptyMsg, attributes: emptyAttr)
+                .draw(in: CGRect(x: rect.minX + 8, y: rect.minY + 25, width: rect.width - 16, height: 14))
+            return
+        }
+
+        let numCols = 3
+        let colWidth = (rect.width - 24) / CGFloat(numCols)
+        let df = DateFormatter()
+        df.locale = isSpanish ? Locale(identifier: "es_ES") : Locale(identifier: "en_US")
+        df.dateFormat = "EEE d MMM"
+
+        let maxItems = min(activeDays.count, 6)
+        for (idx, day) in activeDays.prefix(maxItems).enumerated() {
+            let col = idx % numCols
+            let row = idx / numCols
+            let itemX = rect.minX + 8 + CGFloat(col) * (colWidth + 4)
+            let itemY = rect.maxY - 20 - CGFloat(row + 1) * 26
+            let itemRect = CGRect(x: itemX, y: itemY, width: colWidth, height: 24)
+
+            let isShoot = dayNumbers[day.id] != nil
+            let dateStr = df.string(from: day.date).capitalized
+
+            let dayTag = isShoot ? (isSpanish ? "[DÍA \(dayNumbers[day.id]!)]" : "[DAY \(dayNumbers[day.id]!)]") : (isSpanish ? "[AGENDA]" : "[EVENT]")
+            let scriptScenes = day.scenes.filter { !$0.isCalendarEvent }
+            let events = day.scenes.filter { $0.isCalendarEvent }
+
+            var summary = ""
+            if !events.isEmpty {
+                summary += events.map { ($0.customStartTime.isEmpty ? "" : "\($0.customStartTime) ") + $0.title }.joined(separator: "; ")
+            }
+            if !scriptScenes.isEmpty {
+                if !summary.isEmpty { summary += " | " }
+                summary += scriptScenes.map { s in
+                    let num = s.sceneNumber.isEmpty ? "" : "Esc \(s.sceneNumber): "
+                    let dur = s.duration > 0 ? " (\(formattedEighths(s.duration)))" : ""
+                    return "\(num)\(s.title)\(dur)"
+                }.joined(separator: ", ")
+            }
+
+            let pStyle = NSMutableParagraphStyle()
+            pStyle.lineBreakMode = .byTruncatingTail
+
+            let titleAttr: [NSAttributedString.Key: Any] = [
+                .font: NSFont.boldSystemFont(ofSize: 7.2),
+                .foregroundColor: isShoot ? NSColor(red: 0.1, green: 0.35, blue: 0.8, alpha: 1.0) : NSColor(hexString: "6366F1")
+            ]
+            let bodyAttr: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 6.8),
+                .foregroundColor: NSColor(white: 0.2, alpha: 1.0),
+                .paragraphStyle: pStyle
+            ]
+
+            let fullLine = NSMutableAttributedString(string: "\(dateStr) \(dayTag): ", attributes: titleAttr)
+            fullLine.append(NSAttributedString(string: summary, attributes: bodyAttr))
+            fullLine.draw(in: itemRect)
         }
     }
 }
