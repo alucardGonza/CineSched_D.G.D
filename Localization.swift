@@ -217,6 +217,13 @@ func L(_ key: String, lang: AppLanguage = LocalizationManager.shared.currentLang
         "End Date": [.english: "End Date", .spanish: "Fecha de Fin"],
         "Shift Schedule": [.english: "Shift Schedule", .spanish: "Desplazar Calendario"],
         "Update Calendar": [.english: "Update Calendar", .spanish: "Actualizar Calendario"],
+        "Go to Shoot": [.english: "Go to Shoot", .spanish: "Ir al Rodaje"],
+        "Today": [.english: "Today", .spanish: "Hoy"],
+        "Previous Month": [.english: "Previous Month", .spanish: "Mes Anterior"],
+        "Next Month": [.english: "Next Month", .spanish: "Mes Siguiente"],
+        "Export Month (PDF)": [.english: "Export Month (PDF)", .spanish: "Exportar Mes (PDF)"],
+        "Mark as Shoot Day": [.english: "Mark as Shoot Day", .spanish: "Marcar como Día de Rodaje"],
+        "Unavailable": [.english: "Unavailable", .spanish: "No Disponible"],
 
         // Calendar & Stripboard totals
         "Total:": [.english: "Total:", .spanish: "Total:"],

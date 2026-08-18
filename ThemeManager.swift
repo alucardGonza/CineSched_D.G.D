@@ -102,6 +102,32 @@ enum AppTheme: String, CaseIterable, Codable {
             return isDarkMode ? Color(hex: "2E2818") : Color(hex: "FEF9C3")
         }
     }
+
+    func shootDayRangeHighlight(isDarkMode: Bool) -> Color {
+        switch self {
+        case .system:
+            return Color.accentColor.opacity(isDarkMode ? 0.22 : 0.09)
+        case .blue:
+            return Color(hex: "89CFF0").opacity(isDarkMode ? 0.25 : 0.16)
+        case .green:
+            return Color(hex: "86EFAC").opacity(isDarkMode ? 0.25 : 0.18)
+        case .yellow:
+            return Color(hex: "FEF08A").opacity(isDarkMode ? 0.25 : 0.20)
+        }
+    }
+
+    func shootDayBorderColor(isDarkMode: Bool) -> Color {
+        switch self {
+        case .system:
+            return Color.accentColor.opacity(0.4)
+        case .blue:
+            return Color(hex: "6CAEED").opacity(0.5)
+        case .green:
+            return Color(hex: "4EBA6F").opacity(0.5)
+        case .yellow:
+            return Color(hex: "EAB308").opacity(0.5)
+        }
+    }
 }
 
 extension Color {

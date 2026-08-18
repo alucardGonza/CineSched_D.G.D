@@ -49,11 +49,18 @@ struct StripboardView: View {
     @State private var quickEditingScene: Scene? = nil
     @State private var quickEditingDayId: UUID? = nil
 
+    private var visibleStripboardDays: [(offset: Int, element: ShootDay)] {
+        Array(shootDays.enumerated()).filter { _, day in
+            let isCalendarOnly = !day.scenes.isEmpty && day.scenes.allSatisfy { $0.isCalendarEvent }
+            return !isCalendarOnly
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 10) {
-                    ForEach(Array(shootDays.enumerated()), id: \.element.id) { dayIndex, day in
+                    ForEach(visibleStripboardDays, id: \.element.id) { dayIndex, day in
                         daySection(day: day, dayIndex: dayIndex)
                             .id(day.id)
                             .onAppear {

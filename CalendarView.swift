@@ -98,6 +98,7 @@ struct DayCellView: View {
     let dayIndex: Int
     let dayNumber: Int?
     let isSidebarCollapsed: Bool
+    let isInShootRange: Bool
     let selectedSceneIDs: Set<UUID>
     let conflictSceneIDs: Set<UUID>
     let duplicateSceneNumberIDs: Set<UUID>
@@ -111,6 +112,7 @@ struct DayCellView: View {
     @Binding var interactingSceneId: UUID?
     @Binding var draggedSceneId: UUID?
 
+    let onOpenDayDetail: () -> Void
     let onEditScene: (Int, Scene) -> Void
     let onRemoveScene: (Scene) -> Void
     let onDuplicateScene: (Scene) -> Void
@@ -122,9 +124,14 @@ struct DayCellView: View {
     let onToggleBlackoutWeekday: (ShootDay) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
 
     private var visibleScenes: [Scene] {
         day.scenes.filter { !$0.isBanner || $0.isCalendarEvent }
+    }
+
+    private var isShootDay: Bool {
+        !day.isBlackout && (dayNumber != nil || isInShootRange || !day.scenes.filter { !$0.isCalendarEvent }.isEmpty)
     }
 
     private var isTarget: Bool {
@@ -135,6 +142,7 @@ struct DayCellView: View {
         if dayDropTargetId == day.id { return .green }
         if dropTargetDayId == day.id { return .red }
         if day.isBlackout { return .red.opacity(0.4) }
+        if isShootDay { return currentTheme.shootDayBorderColor(isDarkMode: colorScheme == .dark) }
         return .primary.opacity(0.12)
     }
 
@@ -149,8 +157,12 @@ struct DayCellView: View {
         .frame(minHeight: 120, alignment: .topLeading)
         .background(
             ZStack {
-                Color(NSColor.controlBackgroundColor)
-                if isWeekend(day.date) { Color.black.opacity(colorScheme == .dark ? 0.2 : 0.05) }
+                if isShootDay {
+                    currentTheme.shootDayRangeHighlight(isDarkMode: colorScheme == .dark)
+                } else {
+                    Color(NSColor.controlBackgroundColor)
+                }
+                if isWeekend(day.date) { Color.black.opacity(colorScheme == .dark ? 0.15 : 0.03) }
                 if day.isBlackout { Color.red.opacity(colorScheme == .dark ? 0.25 : 0.1) }
             }
         )
@@ -160,6 +172,10 @@ struct DayCellView: View {
                 .stroke(borderColor, lineWidth: isTarget ? 2 : 1)
         )
         .opacity(draggingDayId == day.id ? 0.4 : 1.0)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            onOpenDayDetail()
+        }
         .onDrop(of: [UTType.text.identifier], delegate: CombinedDayDropDelegate(
             dayId: day.id,
             scenes: visibleScenes,
@@ -174,7 +190,7 @@ struct DayCellView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
+            HStack(alignment: .center, spacing: 4) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(draggingDayId == day.id ? .blue : .secondary)
@@ -187,13 +203,22 @@ struct DayCellView: View {
                     .help("Drag to move this day's scenes and call sheet to another date")
 
                 Button {
-                    callSheetDay = day
+                    onOpenDayDetail()
                 } label: {
                     HStack(spacing: 3) {
-                        Text(formattedDate(day.date))
-                            .font(.caption).bold()
+                        let cal = Calendar.current
+                        let dayOfMonth = cal.component(.day, from: day.date)
+                        let weekdayStr = localizedShortWeekday(day.date)
+
+                        Text("\(dayOfMonth)")
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(day.isBlackout ? .red : .primary)
+
+                        Text(weekdayStr)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
+
                         if day.hasCallSheetData {
                             Circle()
                                 .fill(Color.blue)
@@ -205,9 +230,14 @@ struct DayCellView: View {
 
                 Spacer(minLength: 2)
 
-                if let dayNumber {
+                if let dayNumber, isShootDay {
                     Text("\(L("Day")) \(dayNumber)")
-                        .font(.caption2).fontWeight(.semibold).foregroundColor(.secondary)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(currentTheme.primaryAccent(isDarkMode: colorScheme == .dark))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(currentTheme.primaryAccent(isDarkMode: colorScheme == .dark).opacity(0.18))
+                        .cornerRadius(3.5)
                 }
 
                 Button {
@@ -246,10 +276,19 @@ struct DayCellView: View {
             }
         }
         .contextMenu {
+            Button(LocalizationManager.shared.currentLanguage == .spanish ? "Ver Detalle del Día" : "View Day Details") { onOpenDayDetail() }
             Button(L("Add Calendar Event")) { addingEventForDayId = day.id }
+            Divider()
             Button(day.isBlackout ? "Mark as Available" : "Mark as Unavailable") { onToggleBlackout(day) }
             Button(day.isBlackout ? "Mark Weekday Available" : "Mark Weekday Unavailable") { onToggleBlackoutWeekday(day) }
         }
+    }
+
+    private func localizedShortWeekday(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = LocalizationManager.shared.currentLanguage == .spanish ? Locale(identifier: "es_ES") : Locale(identifier: "en_US")
+        df.dateFormat = "EEE"
+        return df.string(from: date).capitalized
     }
 
     private var sceneList: some View {
@@ -311,15 +350,22 @@ struct DayCellView: View {
 
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEE MMM d"
-        return formatter.string(from: date)
+        formatter.locale = LocalizationManager.shared.currentLanguage == .spanish ? Locale(identifier: "es_ES") : Locale(identifier: "en_US")
+        formatter.dateFormat = "EEE d MMM"
+        return formatter.string(from: date).capitalized
     }
 }
 
 // MARK: - CompactMonthCalendarView
 
+enum CalendarViewMode: String, CaseIterable {
+    case monthGrid
+    case shootDaysOnly
+}
+
 struct CompactMonthCalendarView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
     @ObservedObject private var l10n = LocalizationManager.shared
     @Binding var shootDays: [ShootDay]
     let assignScene:  (Scene, ShootDay) -> Void
@@ -329,6 +375,8 @@ struct CompactMonthCalendarView: View {
     let projectTitle: String
     let productionInfo: ProductionInfo
     let isSidebarCollapsed: Bool
+    let startDate: Date
+    let endDate: Date
     @Binding var selectedSceneIDs:    Set<UUID>
     @Binding var lastSelectedSceneID: UUID?
     let conflictDates: Set<Date>
@@ -339,6 +387,12 @@ struct CompactMonthCalendarView: View {
     let onBeforeSceneChange: () -> Void
     let onSceneChanged: () -> Void
     let onCallSheetExport: (ShootDay) -> Void
+
+    // View Mode Switcher
+    @State private var calendarViewMode: CalendarViewMode = .monthGrid
+
+    // Day Detail Inspector Sheet state
+    @State private var inspectingDay: ShootDay? = nil
 
     // Editing state
     @State private var editingScene:      Scene?
@@ -369,8 +423,41 @@ struct CompactMonthCalendarView: View {
     @State private var editingEventScene: Scene? = nil
     @State private var editingEventDayId: UUID? = nil
 
+    // Month navigation state
+    @State private var displayedMonth: Date = Date()
+
+    private var isSpanish: Bool {
+        LocalizationManager.shared.currentLanguage == .spanish
+    }
+
+    private var startOfDisplayedMonth: Date {
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month], from: displayedMonth)
+        return cal.date(from: comps) ?? displayedMonth
+    }
+
+    private var daysInDisplayedMonth: [Date] {
+        let cal = Calendar.current
+        guard let range = cal.range(of: .day, in: .month, for: startOfDisplayedMonth) else { return [] }
+        return range.compactMap { day -> Date? in
+            cal.date(byAdding: .day, value: day - 1, to: startOfDisplayedMonth)
+        }
+    }
+
+    private var monthLeadingOffsetCount: Int {
+        let cal = Calendar.current
+        let weekday = cal.component(.weekday, from: startOfDisplayedMonth) // 1=Sun, 2=Mon...
+        return (weekday + 5) % 7 // Monday=0
+    }
+
+    private var monthYearTitle: String {
+        let df = DateFormatter()
+        df.locale = isSpanish ? Locale(identifier: "es_ES") : Locale(identifier: "en_US")
+        df.dateFormat = "LLLL yyyy"
+        return df.string(from: displayedMonth).capitalized
+    }
+
     private var weekdaySymbols: [String] {
-        let isSpanish = LocalizationManager.shared.currentLanguage == .spanish
         if isSpanish {
             return ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO"]
         } else {
@@ -378,10 +465,92 @@ struct CompactMonthCalendarView: View {
         }
     }
 
-    private var leadingOffsetCount: Int {
-        guard let firstDay = shootDays.first else { return 0 }
-        let weekday = Calendar.current.component(.weekday, from: firstDay.date) // 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri, 7=Sat
-        return (weekday + 5) % 7
+    private var monthNavigationRow: some View {
+        HStack(spacing: 12) {
+            // View Mode Switcher
+            Picker("", selection: $calendarViewMode) {
+                Text(isSpanish ? "📅 Mes Completo" : "📅 Full Month").tag(CalendarViewMode.monthGrid)
+                Text(isSpanish ? "🎬 Solo Días de Rodaje" : "🎬 Shoot Days Only").tag(CalendarViewMode.shootDaysOnly)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 260)
+
+            Divider().frame(height: 20)
+
+            if calendarViewMode == .monthGrid {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        displayedMonth = Calendar.current.date(byAdding: .month, value: -1, to: displayedMonth) ?? displayedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .buttonStyle(.bordered)
+                .help(L("Previous Month"))
+
+                Text(monthYearTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(minWidth: 150, alignment: .center)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        displayedMonth = Calendar.current.date(byAdding: .month, value: 1, to: displayedMonth) ?? displayedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .buttonStyle(.bordered)
+                .help(L("Next Month"))
+
+                Button(L("Go to Shoot")) {
+                    if let firstShoot = shootDays.first(where: { !$0.scenes.isEmpty }) ?? shootDays.first {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            displayedMonth = firstShoot.date
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                Button(L("Today")) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        displayedMonth = Date()
+                    }
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Text("\(onlyActualShootDays.count) \(isSpanish ? "Días en Plan de Rodaje" : "Days in Schedule")")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                exportMonthPDF()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.doc.fill")
+                    Text(L("Export Month (PDF)"))
+                }
+            }
+            .buttonStyle(.bordered)
+            .help(L("Export Month (PDF)"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var onlyActualShootDays: [(offset: Int, element: ShootDay)] {
+        Array(shootDays.enumerated()).filter { _, day in
+            let start = Calendar.current.startOfDay(for: startDate)
+            let end = Calendar.current.startOfDay(for: endDate)
+            let dayDate = Calendar.current.startOfDay(for: day.date)
+            let inRange = dayDate >= start && dayDate <= end
+            let isCalendarOnly = !day.scenes.isEmpty && day.scenes.allSatisfy { $0.isCalendarEvent }
+            return inRange && !isCalendarOnly
+        }
     }
 
     private var weekdayHeaderRow: some View {
@@ -403,19 +572,44 @@ struct CompactMonthCalendarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            monthNavigationRow
+
             weekdayHeaderRow
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
                     let columns = Array(repeating: GridItem(.flexible(minimum: 100), spacing: 8), count: 7)
                     LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(0..<leadingOffsetCount, id: \.self) { _ in
-                            Color.clear
-                                .frame(minHeight: 120)
-                        }
-                        ForEach(Array(shootDays.enumerated()), id: \.element.id) { dayIndex, day in
-                            dayCell(day: day, dayIndex: dayIndex)
-                                .id(day.id)
+                        if calendarViewMode == .monthGrid {
+                            ForEach(0..<monthLeadingOffsetCount, id: \.self) { _ in
+                                Color.clear
+                                    .frame(minHeight: 120)
+                            }
+                            ForEach(daysInDisplayedMonth, id: \.self) { date in
+                                if let dayIndex = shootDays.firstIndex(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+                                    dayCell(day: shootDays[dayIndex], dayIndex: dayIndex)
+                                        .id(shootDays[dayIndex].id)
+                                } else {
+                                    emptyDayCell(for: date)
+                                        .id(date)
+                                }
+                            }
+                        } else {
+                            // Shoot Days Only mode
+                            let shootDaysList = onlyActualShootDays
+                            let leadingShootOffset: Int = {
+                                guard let first = shootDaysList.first?.element else { return 0 }
+                                let weekday = Calendar.current.component(.weekday, from: first.date)
+                                return (weekday + 5) % 7
+                            }()
+                            ForEach(0..<leadingShootOffset, id: \.self) { _ in
+                                Color.clear
+                                    .frame(minHeight: 120)
+                            }
+                            ForEach(shootDaysList, id: \.element.id) { dayIndex, day in
+                                dayCell(day: day, dayIndex: dayIndex)
+                                    .id(day.id)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -423,6 +617,7 @@ struct CompactMonthCalendarView: View {
                 }
                 .onChange(of: scrollToDate) { newValue in
                     guard let date = newValue else { return }
+                    displayedMonth = date
                     if let target = shootDays.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
                         withAnimation { proxy.scrollTo(target.id, anchor: .top) }
                     }
@@ -432,6 +627,41 @@ struct CompactMonthCalendarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .tooltipContainer()
+        .onAppear {
+            if let firstShoot = shootDays.first(where: { !$0.scenes.isEmpty }) ?? shootDays.first {
+                displayedMonth = firstShoot.date
+            }
+        }
+        .sheet(item: $inspectingDay) { day in
+            DayDetailSheet(
+                day: day,
+                dayNumber: dayNumbers[day.id],
+                productionInfo: productionInfo,
+                isPresented: Binding(
+                    get: { inspectingDay != nil },
+                    set: { if !$0 { inspectingDay = nil } }
+                ),
+                onEditScene: { scene in
+                    if let dIdx = shootDays.firstIndex(where: { $0.id == day.id }),
+                       let sIdx = shootDays[dIdx].scenes.firstIndex(where: { $0.id == scene.id }) {
+                        inspectingDay = nil
+                        editScene(dayIndex: dIdx, sceneIndex: sIdx, scene: scene, dayId: day.id)
+                    }
+                },
+                onAddCalendarEvent: {
+                    inspectingDay = nil
+                    addingEventForDayId = day.id
+                },
+                onOpenCallSheet: {
+                    inspectingDay = nil
+                    callSheetDay = day
+                },
+                onExportCallSheetPDF: {
+                    inspectingDay = nil
+                    onCallSheetExport(day)
+                }
+            )
+        }
         .sheet(isPresented: $showingEditSheet) {
             editSheetContent()
         }
@@ -488,17 +718,118 @@ struct CompactMonthCalendarView: View {
         }
     }
 
+    @ViewBuilder
+    private func emptyDayCell(for date: Date) -> some View {
+        let cal = Calendar.current
+        let dayDigit = cal.component(.day, from: date)
+        let isShootRange = date >= cal.startOfDay(for: startDate) && date <= cal.startOfDay(for: endDate)
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("\(dayDigit)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(isShootRange ? currentTheme.primaryAccent(isDarkMode: colorScheme == .dark) : .secondary)
+                Spacer()
+                Button {
+                    createAndAddEvent(for: date)
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(L("Add Calendar Event"))
+            }
+            Spacer()
+        }
+        .padding(8)
+        .frame(minHeight: 120, alignment: .topLeading)
+        .background(
+            isShootRange
+                ? currentTheme.shootDayRangeHighlight(isDarkMode: colorScheme == .dark)
+                : Color(NSColor.controlBackgroundColor).opacity(0.5)
+        )
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    isShootRange
+                        ? currentTheme.shootDayBorderColor(isDarkMode: colorScheme == .dark)
+                        : Color.primary.opacity(0.06),
+                    lineWidth: 1
+                )
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            createAndAddEvent(for: date)
+        }
+        .contextMenu {
+            Button(L("Add Calendar Event")) {
+                createAndAddEvent(for: date)
+            }
+            Button(L("Mark as Shoot Day")) {
+                onBeforeSceneChange()
+                let newDay = ShootDay(date: date)
+                shootDays.append(newDay)
+                shootDays.sort { $0.date < $1.date }
+                onSceneChanged()
+            }
+        }
+    }
+
+    private func createAndAddEvent(for date: Date) {
+        if let existing = shootDays.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+            addingEventForDayId = existing.id
+        } else {
+            onBeforeSceneChange()
+            let newDay = ShootDay(date: date)
+            shootDays.append(newDay)
+            shootDays.sort { $0.date < $1.date }
+            onSceneChanged()
+            addingEventForDayId = newDay.id
+        }
+    }
+
+    private func exportMonthPDF() {
+        guard let pdfData = PDFExporter.generateMonthPDF(
+            month: displayedMonth,
+            shootDays: shootDays,
+            projectTitle: projectTitle,
+            productionInfo: productionInfo
+        ) else { return }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy_MM"
+        let monthStr = df.string(from: displayedMonth)
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.pdf]
+        savePanel.canCreateDirectories = true
+        savePanel.isExtensionHidden = false
+        savePanel.title = L("Export Month (PDF)")
+        savePanel.nameFieldStringValue = "Calendario_\(monthStr).pdf"
+
+        savePanel.begin { response in
+            if response == .OK, let url = savePanel.url {
+                try? pdfData.write(to: url)
+            }
+        }
+    }
+
     // MARK: - Day Cell Component
 
     private var dayNumbers: [UUID: Int] { productionDayNumbers(for: shootDays) }
 
     @ViewBuilder
     private func dayCell(day: ShootDay, dayIndex: Int) -> some View {
+        let cal = Calendar.current
+        let inRange = day.date >= cal.startOfDay(for: startDate) && day.date <= cal.startOfDay(for: endDate)
+
         DayCellView(
             day: day,
             dayIndex: dayIndex,
             dayNumber: dayNumbers[day.id],
             isSidebarCollapsed: isSidebarCollapsed,
+            isInShootRange: inRange,
             selectedSceneIDs: selectedSceneIDs,
             conflictSceneIDs: conflictSceneIDs,
             duplicateSceneNumberIDs: duplicateSceneNumberIDs,
@@ -510,6 +841,7 @@ struct CompactMonthCalendarView: View {
             callSheetDay: $callSheetDay,
             interactingSceneId: $interactingSceneId,
             draggedSceneId: $draggedSceneId,
+            onOpenDayDetail: { inspectingDay = day },
             onEditScene: { sceneIndex, scene in editScene(dayIndex: dayIndex, sceneIndex: sceneIndex, scene: scene, dayId: day.id) },
             onRemoveScene: { scene in removeFromDay(scene, dayId: day.id) },
             onDuplicateScene: { scene in duplicateScene(scene) },
@@ -768,14 +1100,14 @@ struct SceneCardView: View {
         Group {
             if scene.isCalendarEvent {
                 HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(displayColor)
                     let clockStr = scene.customStartTime.isEmpty ? scene.summary : scene.customStartTime
                     if !clockStr.isEmpty {
                         Text(clockStr)
                             .font(.system(size: 8.5, weight: .bold))
                             .foregroundColor(displayColor)
+                        Text("·")
+                            .font(.system(size: 8.5, weight: .bold))
+                            .foregroundColor(displayColor.opacity(0.6))
                     }
                     Text(scene.bannerTitle.isEmpty ? scene.title : scene.bannerTitle)
                         .font(.system(size: 9.5, weight: .semibold))

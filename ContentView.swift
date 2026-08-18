@@ -418,10 +418,21 @@ struct ContentView: View {
                     DatePicker(L("End Date"), selection: $endDate, displayedComponents: .date)
                         .onChange(of: endDate) { _ in markDirty() }
 
-                    Toggle(isOn: $isShiftModeEnabled) { Text(L("Shift Schedule")) }
-                        .toggleStyle(.switch)
-                        .help("When enabled, changing the Start Date shifts all scenes on the calendar.")
-                        .onChange(of: isShiftModeEnabled) { _ in markDirty() }
+                    Toggle(isOn: $isShiftModeEnabled) {
+                        HStack(spacing: 4) {
+                            Text(L("Shift Schedule"))
+                            Image(systemName: "info.circle")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .fastTooltip(
+                        LocalizationManager.shared.currentLanguage == .spanish
+                            ? "Desplazar Calendario\nCuando está activado, al cambiar la Fecha de Inicio se desplazan automáticamente todas las escenas ya programadas en el calendario, conservando la distribución del plan de rodaje."
+                            : "Shift Schedule\nWhen enabled, changing the Start Date automatically shifts all scheduled scenes across the calendar, preserving your shoot day plan."
+                    )
+                    .onChange(of: isShiftModeEnabled) { _ in markDirty() }
 
                     Button(L("Update Calendar")) { updateShootDays(from: startDate, to: endDate) }
                 }
@@ -861,6 +872,8 @@ struct ContentView: View {
                     projectTitle: projectTitle,
                     productionInfo: productionInfo,
                     isSidebarCollapsed: isSidebarCollapsed,
+                    startDate: startDate,
+                    endDate: endDate,
                     selectedSceneIDs: $selectedSceneIDs,
                     lastSelectedSceneID: $lastSelectedSceneID,
                     conflictDates: conflictDates,
