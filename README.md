@@ -5,12 +5,27 @@ A modern, high-performance macOS application for film and television scheduling 
 ![Platform](https://img.shields.io/badge/platform-macOS-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.0-orange)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-4.0-green)
-![Version](https://img.shields.io/badge/version-4.5.0-purple)
+![Version](https://img.shields.io/badge/version-4.5.1-purple)
 ![License](https://img.shields.io/badge/license-GPL--v3-lightgrey)
 
-> **CineSched D.G.D Fork**: Enhanced with dynamic timeline cascade, 7-column production calendar, vector shooting schedule PDF generation, pure bilingual localization (Español / English), and independent calendar events.
+> **CineSched D.G.D Fork**: Enhanced with dynamic timeline cascade, 7-column production calendar, monthly calendar view with day inspector, 2-page vector monthly PDF generator, vector shooting schedule PDF generation, pure bilingual localization (Español / English), anti-data-loss protection, and independent calendar events.
 
 ## ✨ Key Features & New Additions
+
+### 🗓️ Monthly Production Calendar & Day Detail Modal
+- **Month-by-Month Production View**: Clean month navigation with live system theme tinting and shoot date range highlighting.
+- **Interactive Day Inspector (Double-Click Day Cell)**:
+  - Production day number (`Día #X de Rodaje`), scene counts, total eighths, and estimated shoot times.
+  - Call sheet milestone schedule badges (General Call, Lunch, Snack, Wrap, Basecamp).
+  - Quick action buttons to edit and export individual Call Sheets.
+  - Contextual off-day mode displaying agenda events without clutter.
+- **Shoot Days Only View Filter**: Cleanly isolates scheduled production dates, hiding off-range calendar events for focused planning.
+- **Direct Boneyard Drag & Drop**: Drag scenes directly from the Boneyard into any day or empty calendar tile.
+- **Anti-Data-Loss Safety Net**: Updating or shifting calendar date ranges automatically returns any displaced scenes back to the Boneyard (`allScenes`).
+
+### 📄 2-Page Vector Monthly Calendar PDF Export
+- **Page 1 (Full-Height Calendar Grid)**: 100% full-height landscape grid with large, readable day cells displaying scene numbers, titles, octavos, and clean agenda badges without vertical clipping.
+- **Page 2 (Detailed Monthly Breakdown & Schedule)**: Generates a dedicated breakdown page detailing every active day of the month with full scene summaries, cast list, real locations, call sheet times, and agenda events.
 
 ### 🌐 100% Multilingual Support (Español / English)
 - Instant language switching between **Español** and **English** with reactive UI updates across all views, menus, and sheets.

@@ -2,6 +2,24 @@
 
 All notable changes to CineSched are documented here.
 
+## [4.5.1] - 2026 (Monthly Calendar & Vector Export Edition)
+### Added
+- **Full Monthly Calendar View (Vista por Mes)** — Intuitive month-by-month calendar navigation with system theme matching, shoot range highlighting, and month-level scheduling.
+- **Interactive Day Detail Modal (DayDetailSheet)** — Double-click any day in the month view to open a rich modal inspector with production day numbers, page/scene statistics, call sheet schedule badges (Call, Lunch, Snack, Wrap, Basecamp), and agenda event management.
+- **Adaptive Day Inspector** — Context-aware presentation: shoot days show full call sheet and scene breakdown actions; off-days and prep days display an uncluttered agenda management view.
+- **Shoot Days Only View Mode** — Filter out non-production days and off-range calendar events to focus strictly on scheduled shoot days.
+- **Boneyard to Calendar Drag-and-Drop** — Seamlessly drag script scenes directly from the Boneyard (`allScenes`) into any calendar cell or empty date tile.
+- **Calendar Event Deletion & Management** — Direct delete buttons (trash icon) in the day detail sheet and right-click context menu (`Eliminar Evento` / `Delete Event`) on event chips.
+- **2-Page High-Resolution Monthly PDF Exporter**:
+  - **Page 1 (Full-Height Calendar Grid)**: 100% of the page height is dedicated to the calendar grid, ensuring tall, spacious day cells with legible scene numbers, titles, octavos, and start times without compression.
+  - **Page 2 (Detailed Monthly Breakdown & Schedule)**: Generates a second page with comprehensive structured cards for every active day of the month, displaying complete scene synopses, INT/EXT headings, cast list, real locations, call sheet times, and agenda events.
+
+### Improved
+- **Anti-Data-Loss Safety Net in "Update Calendar"** — When adjusting or trimming the production date range, all displaced script scenes automatically return to the Boneyard (`allScenes`) rather than being discarded.
+- **Anchored Calendar Events** — Agenda events (`isCalendarEvent`) are permanently locked to their absolute calendar dates and are excluded from "Shift Schedule" scene displacements.
+- **Clean Event Typography** — Removed redundant calendar emoji icons from event chips in favor of crisp time-prefixed badges (`10:00 AM · Lectura de guion`).
+- **Production Day Numbering Integrity** — Calendar-only events outside the shooting schedule do not increment production day numbers (`Día #1`, `Día #2`).
+
 ## [4.5.0] - 2026 (D.G.D Edition)
 ### Added
 - **Dynamic Shooting Schedule (Plan de Rodaje) Vector PDF Exporter** — standard vector PDF exporter with 4 bounded columns (Time, Scene and Full Slugline, Script Page, Eighths) with zero text collisions and dynamic milestone badges.
