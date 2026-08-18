@@ -217,6 +217,7 @@ struct ContentView: View {
                 case .productionSetup:
                     ProductionSetupSheet(
                         productionInfo: $productionInfo,
+                        scenes: allScenes + shootDays.flatMap { $0.scenes },
                         isPresented: isPresentedProductionSetup,
                         onSave: { markDirty(); recomputeConflicts(); recomputeScheduleLockChanges() },
                         onCharacterRenamed: renameCastCharacter
@@ -719,21 +720,11 @@ struct ContentView: View {
                         Spacer(minLength: 4)
 
                         Text(FractionParser.formatEighths(item.scene.duration))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(item.scene.stripTextColor.opacity(0.7))
-
-                        Button {
-                            captureUndoSnapshot()
-                            allScenes.remove(at: item.index)
-                            markDirty()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 10))
-                                .foregroundColor(item.scene.stripTextColor.opacity(0.5))
-                        }
-                        .buttonStyle(.plain)
+                            .font(.system(size: 10, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(item.scene.stripTextColor.opacity(0.8))
                     }
-                    .padding(.vertical, 4).padding(.horizontal, 6)
+                    .padding(.vertical, 4).padding(.horizontal, 8)
                     .contentShape(Rectangle())
                     .background(item.scene.stripColor)
                     .cornerRadius(3)

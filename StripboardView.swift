@@ -57,7 +57,7 @@ struct StripboardView: View {
                         daySection(day: day, dayIndex: dayIndex)
                             .id(day.id)
                             .onAppear {
-                                syncMealStrips(for: dayIndex)
+                                syncAutoBannersAndMeals(for: dayIndex)
                             }
                     }
                 }
@@ -119,12 +119,14 @@ struct StripboardView: View {
         }
     }
 
-    private func syncMealStrips(for dayIndex: Int) {
+    private func syncAutoBannersAndMeals(for dayIndex: Int) {
         guard dayIndex < shootDays.count else { return }
         let day = shootDays[dayIndex]
         let cs = day.callSheet
 
-        let mealsToEnsure: [(kind: MealKind, time: String)] = [
+        let itemsToEnsure: [(kind: MealKind, time: String)] = [
+            (.generalCall, cs.generalCallTime),
+            (.readyToShoot, cs.readyToShootTime),
             (.lunch, cs.lunchTime),
             (.snack, cs.snackTime),
             (.dinner, cs.dinnerTime),
@@ -133,19 +135,38 @@ struct StripboardView: View {
 
         var updatedScenes = shootDays[dayIndex].scenes
 
-        for meal in mealsToEnsure {
-            let timeClean = meal.time.trimmingCharacters(in: .whitespaces)
-            let existingIdx = updatedScenes.firstIndex(where: { $0.isAutoMeal && $0.mealKind == meal.kind })
+        for item in itemsToEnsure {
+            let timeClean = item.time.trimmingCharacters(in: .whitespaces)
+            let existingIdx = updatedScenes.firstIndex(where: { $0.isAutoMeal && $0.mealKind == item.kind })
 
             if !timeClean.isEmpty {
+                let colorHex: String
+                switch item.kind {
+                case .generalCall:  colorHex = "1E3A8A"
+                case .readyToShoot: colorHex = "064E3B"
+                case .lunch, .snack, .dinner: colorHex = "18181B"
+                case .wrap:         colorHex = "991B1B"
+                }
+
                 if let idx = existingIdx {
-                    let title = "\(meal.kind.icon) \(meal.kind.defaultTitle) (\(timeClean))"
+                    let title = "\(item.kind.icon) \(item.kind.defaultTitle) (\(timeClean))"
                     updatedScenes[idx].title = title
                     updatedScenes[idx].bannerTitle = title
                     updatedScenes[idx].summary = timeClean
+                    updatedScenes[idx].customStartTime = timeClean
+                    updatedScenes[idx].bannerColorHex = colorHex
                 } else {
-                    let newMealStrip = Scene.createAutoMeal(kind: meal.kind, timeString: timeClean)
-                    updatedScenes.append(newMealStrip)
+                    let newStrip = Scene.createAutoMeal(kind: item.kind, timeString: timeClean)
+                    if item.kind == .generalCall {
+                        updatedScenes.insert(newStrip, at: 0)
+                    } else if item.kind == .readyToShoot {
+                        let insertIdx = updatedScenes.firstIndex(where: { $0.isAutoMeal && $0.mealKind == .generalCall }) != nil ? 1 : 0
+                        updatedScenes.insert(newStrip, at: min(insertIdx, updatedScenes.count))
+                    } else if item.kind == .wrap {
+                        updatedScenes.append(newStrip)
+                    } else {
+                        updatedScenes.append(newStrip)
+                    }
                 }
             } else if let idx = existingIdx {
                 updatedScenes.remove(at: idx)
@@ -171,13 +192,18 @@ struct StripboardView: View {
             if !s.customStartTime.isEmpty, let customMin = parseTimeToMinutes(s.customStartTime) {
                 startMin = customMin
             }
-            let dur = s.estimatedTime > 0 ? s.estimatedTime : (s.isBanner ? 30 : 15)
+            let dur: Int
+            if s.isBanner {
+                dur = s.estimatedTime
+            } else {
+                dur = s.estimatedTime > 0 ? s.estimatedTime : 15
+            }
             let endMin = startMin + dur
 
             let startClock = formatMinutesToClock(startMin)
             let endClock = formatMinutesToClock(endMin)
             let durClock = formattedTimeHM(dur)
-            let fullRange = "\(startClock) – \(endClock)"
+            let fullRange = (dur == 0) ? startClock : "\(startClock) – \(endClock)"
 
             map[s.id] = (timeDisplay: fullRange, startStr: startClock, endStr: endClock, durStr: durClock)
             startMin = endMin
@@ -421,6 +447,7 @@ struct StripboardView: View {
                 ),
                 onSave: {
                     callSheetDay = nil
+                    syncAutoBannersAndMeals(for: idx)
                     onSceneChanged()
                 },
                 onExportPDF: { exportDay in
@@ -708,10 +735,11 @@ struct SceneStripRow: View {
                 } label: {
                     Text(timeDisplay)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(scene.stripTextColor.opacity(0.85))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.14))
+                        .foregroundColor(scene.stripTextColor.opacity(0.9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(width: 142, height: 20, alignment: .center)
+                        .background(Color.black.opacity(0.18))
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
@@ -753,7 +781,8 @@ struct SceneStripRow: View {
                 }
 
                 Text(FractionParser.formatEighths(scene.duration))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold))
+                    .monospacedDigit()
                     .foregroundColor(scene.stripTextColor.opacity(0.8))
             }
             .contentShape(Rectangle())
@@ -768,7 +797,7 @@ struct SceneStripRow: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(scene.stripColor.opacity(isDragging ? 0.7 : 1))
+        .background(scene.stripColor)
         .overlay(
             Rectangle()
                 .stroke(isSelected ? Color.accentColor : scene.stripTextColor.opacity(0.2), lineWidth: isSelected ? 2 : 0.5)
@@ -816,8 +845,51 @@ struct BannerStripRow: View {
 
     private var isDragging: Bool { interactingSceneId == scene.id }
     private var bannerColor: Color {
-        if scene.bannerColorHex.isEmpty { return Color.purple }
+        if scene.isAutoMeal {
+            if let kind = scene.mealKind {
+                switch kind {
+                case .lunch, .snack, .dinner: return Color(hex: "18181B")
+                case .generalCall:  return Color(hex: "1E3A8A")
+                case .readyToShoot: return Color(hex: "064E3B")
+                case .wrap:         return Color(hex: "991B1B")
+                }
+            }
+            return Color(hex: "18181B")
+        }
+        if scene.bannerType == .mealBreak || scene.title.lowercased().contains("almuerzo") || scene.title.lowercased().contains("lunch") || scene.title.lowercased().contains("cena") || scene.title.lowercased().contains("dinner") || scene.title.lowercased().contains("snack") || scene.title.lowercased().contains("merienda") {
+            return Color(hex: "18181B")
+        }
+        if scene.bannerColorHex == "F59E0B" {
+            return Color(hex: "18181B")
+        }
+        if scene.bannerColorHex.isEmpty { return Color(hex: "334155") }
         return Color(hex: scene.bannerColorHex)
+    }
+
+    private var bannerDisplayTitle: String {
+        if let kind = scene.mealKind {
+            return "\(kind.icon) \(kind.defaultTitle)"
+        }
+        let raw = scene.title.replacingOccurrences(of: #"\s*\(\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+        if raw == "Notice / Note" || raw == "Aviso / Nota" || raw == "Notice" || raw == "Nota" || raw == "Aviso" {
+            return L("Notice")
+        }
+        if raw.contains("ALMUERZO / LUNCH") || raw.contains("LUNCH / ALMUERZO") {
+            return "🍽️ \(L("LUNCH"))"
+        }
+        if raw.contains("MERIENDA / SNACK") || raw.contains("SNACK / MERIENDA") {
+            return "☕ \(L("SNACK"))"
+        }
+        if raw.contains("CENA / DINNER") || raw.contains("DINNER / CENA") {
+            return "🍕 \(L("DINNER"))"
+        }
+        if raw.contains("FIN DE RODAJE / WRAP") || raw.contains("WRAP / FIN DE RODAJE") {
+            return "🎬 \(L("WRAP"))"
+        }
+        if raw.contains("READY TO SHOOT / EN SET") {
+            return "🎬 \(L("READY TO SHOOT"))"
+        }
+        return raw
     }
 
     var body: some View {
@@ -829,21 +901,23 @@ struct BannerStripRow: View {
                     Text(timeDisplay)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.35))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(width: 142, height: 20, alignment: .center)
+                        .background(Color.black.opacity(0.32))
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
                 .help("Clic para ajustar horario o duración / Click to edit time")
             }
 
-            Image(systemName: scene.bannerType?.defaultIcon ?? "flag.fill")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white)
+            if !scene.isAutoMeal {
+                Image(systemName: scene.bannerType?.defaultIcon ?? "flag.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+            }
 
-            let cleanedTitle = scene.title.replacingOccurrences(of: #"\s*\(\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
-            Text(cleanedTitle)
+            Text(bannerDisplayTitle)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -866,7 +940,7 @@ struct BannerStripRow: View {
             .buttonStyle(.plain)
             .help("Eliminar Tira / Delete Banner")
         }
-        .padding(.horizontal, 10).padding(.vertical, 5)
+        .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(bannerColor)
         .cornerRadius(4)

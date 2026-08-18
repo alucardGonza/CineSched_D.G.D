@@ -139,10 +139,10 @@ struct BannerInputSheet: View {
 
     private var placeholderForType: String {
         switch bannerType {
-        case .companyMove: return "Company Move"
-        case .mealBreak:   return "Meal Break / Lunch"
-        case .notice:      return "Notice / Production Note"
-        case .custom:      return "Custom Banner Text"
+        case .companyMove: return L("Company Move")
+        case .mealBreak:   return L("Meal Break")
+        case .notice:      return L("Notice")
+        case .custom:      return L("Custom Banner")
         }
     }
 
@@ -150,7 +150,7 @@ struct BannerInputSheet: View {
         switch type {
         case .companyMove: return L("Company Move")
         case .mealBreak:   return L("Meal Break")
-        case .notice:      return L("Notice / Note")
+        case .notice:      return L("Notice")
         case .custom:      return L("Custom Banner")
         }
     }

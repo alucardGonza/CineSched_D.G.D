@@ -147,30 +147,20 @@ struct SceneEditSheet: View {
                     }
                 }
 
-                // Estimated Time & Custom Start Time
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Estimated Time").font(.headline)
-                        TextField(TimeParser.placeholderText, text: $editEstimatedTime)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .focused($focusedField, equals: .estimate)
-                            .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
-                            .onChange(of: editEstimatedTime) { _ in validateEstimatedTime() }
+                // Estimated Time
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Estimated Time").font(.headline)
+                    TextField(TimeParser.placeholderText, text: $editEstimatedTime)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .focused($focusedField, equals: .estimate)
+                        .border(estimatedTimeIsValid ? Color.clear : Color.red, width: 1)
+                        .onChange(of: editEstimatedTime) { _ in validateEstimatedTime() }
 
-                        if !estimatedTimeIsValid {
-                            Text("Invalid format. Use: 4 (4 hours), 15 (15 minutes), or 2:30 (2hr 30min)")
-                                .font(.caption).foregroundColor(.red)
-                        } else if let hint = TimeParser.getInputHint(editEstimatedTime), !editEstimatedTime.isEmpty {
-                            Text(hint).font(.caption).foregroundColor(.secondary)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Start Time (Optional)").font(.headline)
-                        TextField("e.g. 07:30 or 01:30 PM", text: $editCustomStartTime)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        Text("Leave blank for auto-time")
-                            .font(.caption).foregroundColor(.secondary)
+                    if !estimatedTimeIsValid {
+                        Text("Invalid format. Use: 4 (4 hours), 15 (15 minutes), or 2:30 (2hr 30min)")
+                            .font(.caption).foregroundColor(.red)
+                    } else if let hint = TimeParser.getInputHint(editEstimatedTime), !editEstimatedTime.isEmpty {
+                        Text(hint).font(.caption).foregroundColor(.secondary)
                     }
                 }
 

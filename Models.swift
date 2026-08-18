@@ -84,14 +84,14 @@ enum DayNightType: String, Codable, CaseIterable {
 enum BannerType: String, CaseIterable, Codable {
     case companyMove = "Company Move"
     case mealBreak   = "Meal Break"
-    case notice      = "Notice / Note"
+    case notice      = "Notice"
     case custom      = "Custom Banner"
 
     var localizedName: String {
         switch self {
         case .companyMove: return L("Company Move")
         case .mealBreak:   return L("Meal Break")
-        case .notice:      return L("Notice / Note")
+        case .notice:      return L("Notice")
         case .custom:      return L("Custom Banner")
         }
     }
@@ -100,33 +100,56 @@ enum BannerType: String, CaseIterable, Codable {
         switch self {
         case .companyMove: return "truck.box.fill"
         case .mealBreak:   return "fork.knife"
-        case .notice:      return "exclamationmark.triangle.fill"
+        case .notice:      return "note.text"
         case .custom:      return "flag.fill"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = (try? container.decode(String.self)) ?? ""
+        switch raw {
+        case "Company Move", "Traslado", "Traslado de Equipo":
+            self = .companyMove
+        case "Meal Break", "Comida", "Pausa de Comida":
+            self = .mealBreak
+        case "Notice / Note", "Notice", "Note", "Aviso / Nota", "Aviso", "Nota":
+            self = .notice
+        case "Custom Banner", "Tira Personalizada", "Banner Personalizado":
+            self = .custom
+        default:
+            self = BannerType(rawValue: raw) ?? .notice
         }
     }
 }
 
 enum MealKind: String, CaseIterable, Codable {
-    case lunch  = "Lunch"
-    case snack  = "Snack"
-    case dinner = "Dinner"
-    case wrap   = "Wrap"
+    case generalCall  = "General Call"
+    case readyToShoot = "Ready to Shoot"
+    case lunch        = "Lunch"
+    case snack        = "Snack"
+    case dinner       = "Dinner"
+    case wrap         = "Wrap"
 
     var icon: String {
         switch self {
-        case .lunch:  return "🍽️"
-        case .snack:  return "☕"
-        case .dinner: return "🍕"
-        case .wrap:   return "🎬"
+        case .generalCall:  return "⏰"
+        case .readyToShoot: return "🎬"
+        case .lunch:        return "🍽️"
+        case .snack:        return "☕"
+        case .dinner:       return "🍕"
+        case .wrap:         return "🎬"
         }
     }
 
     var defaultTitle: String {
         switch self {
-        case .lunch:  return L("ALMUERZO / LUNCH")
-        case .snack:  return L("MERIENDA / SNACK")
-        case .dinner: return L("CENA / DINNER")
-        case .wrap:   return L("FIN DE RODAJE / WRAP")
+        case .generalCall:  return L("GENERAL CALL")
+        case .readyToShoot: return L("READY TO SHOOT")
+        case .lunch:        return L("LUNCH")
+        case .snack:        return L("SNACK")
+        case .dinner:       return L("DINNER")
+        case .wrap:         return L("WRAP")
         }
     }
 }
@@ -252,21 +275,54 @@ struct Scene: Identifiable, Codable, Hashable {
     }
 
     static func createAutoMeal(kind: MealKind, timeString: String) -> Scene {
-        let title = "\(kind.icon) \(kind.defaultTitle) \(timeString.isEmpty ? "" : "(\(timeString))")"
+        let cleanTime = timeString.trimmingCharacters(in: .whitespaces)
+        let title = "\(kind.icon) \(kind.defaultTitle) \(cleanTime.isEmpty ? "" : "(\(cleanTime))")"
+        let colorHex: String
+        let estTime: Int
+        let bType: BannerType
+
+        switch kind {
+        case .generalCall:
+            colorHex = "1E3A8A" // Midnight Navy
+            estTime  = 0
+            bType    = .notice
+        case .readyToShoot:
+            colorHex = "064E3B" // Deep Forest Green
+            estTime  = 0
+            bType    = .notice
+        case .lunch:
+            colorHex = "18181B" // Black / Dark Charcoal
+            estTime  = 60
+            bType    = .mealBreak
+        case .snack:
+            colorHex = "18181B" // Black / Dark Charcoal
+            estTime  = 15
+            bType    = .mealBreak
+        case .dinner:
+            colorHex = "18181B" // Black / Dark Charcoal
+            estTime  = 60
+            bType    = .mealBreak
+        case .wrap:
+            colorHex = "991B1B" // Deep Crimson Red
+            estTime  = 0
+            bType    = .notice
+        }
+
         return Scene(
             title: title,
             sceneNumber: "",
             duration: 0,
-            estimatedTime: kind == .snack ? 15 : 60,
+            estimatedTime: estTime,
             dayNightType: .custom,
-            summary: timeString,
+            summary: cleanTime,
             isBanner: true,
-            bannerType: .mealBreak,
+            bannerType: bType,
             bannerTitle: title,
-            bannerNote: timeString,
-            bannerColorHex: "F59E0B",
+            bannerNote: cleanTime,
+            bannerColorHex: colorHex,
             isAutoMeal: true,
-            mealKind: kind
+            mealKind: kind,
+            customStartTime: cleanTime
         )
     }
 
@@ -341,12 +397,12 @@ struct Scene: Identifiable, Codable, Hashable {
         vfx              = try c.decodeIfPresent([String].self, forKey: .vfx) ?? []
         breakdownNotes   = try c.decodeIfPresent(String.self, forKey: .breakdownNotes) ?? ""
         isBanner         = try c.decodeIfPresent(Bool.self, forKey: .isBanner) ?? false
-        bannerType       = try c.decodeIfPresent(BannerType.self, forKey: .bannerType)
+        bannerType       = (try? c.decodeIfPresent(BannerType.self, forKey: .bannerType)) ?? nil
         bannerTitle      = try c.decodeIfPresent(String.self, forKey: .bannerTitle) ?? ""
         bannerNote       = try c.decodeIfPresent(String.self, forKey: .bannerNote) ?? ""
         bannerColorHex   = try c.decodeIfPresent(String.self, forKey: .bannerColorHex) ?? ""
         isAutoMeal       = try c.decodeIfPresent(Bool.self, forKey: .isAutoMeal) ?? false
-        mealKind         = try c.decodeIfPresent(MealKind.self, forKey: .mealKind)
+        mealKind         = (try? c.decodeIfPresent(MealKind.self, forKey: .mealKind)) ?? nil
         isCalendarEvent  = try c.decodeIfPresent(Bool.self, forKey: .isCalendarEvent) ?? false
         customStartTime  = try c.decodeIfPresent(String.self, forKey: .customStartTime) ?? ""
     }

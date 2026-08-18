@@ -7,6 +7,7 @@ import SwiftUI
 struct ProductionSetupSheet: View {
     @ObservedObject private var l10n = LocalizationManager.shared
     @Binding var productionInfo: ProductionInfo
+    var scenes: [Scene] = []
     @Binding var isPresented: Bool
     let onSave: () -> Void
     /// Called once per renamed character (oldName, newName) when Save is pressed, so the
@@ -281,7 +282,21 @@ struct ProductionSetupSheet: View {
                     Divider()
 
                     // Location roster
-                    Label(L("Location Roster"), systemImage: "mappin.and.ellipse").font(.headline)
+                    HStack {
+                        Label(L("Location Roster"), systemImage: "mappin.and.ellipse").font(.headline)
+                        Spacer()
+                        Button {
+                            pullLocationsFromBreakdown()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                Text(L("Pull from Breakdown"))
+                            }
+                            .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .help("Extract and import all locations from scene breakdown")
+                    }
 
                     if locationRoster.isEmpty {
                         Text(L("No locations added yet.")).font(.caption).foregroundColor(.secondary)
@@ -378,6 +393,29 @@ struct ProductionSetupSheet: View {
             castList         = productionInfo.castList
             crew             = productionInfo.crew
             locationRoster   = productionInfo.locationRoster
+
+            if locationRoster.isEmpty {
+                pullLocationsFromBreakdown()
+            }
+        }
+    }
+
+    private func pullLocationsFromBreakdown() {
+        var existingNames = Set(locationRoster.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() })
+        for s in scenes where !s.isBanner && !s.isCalendarEvent {
+            let locName: String
+            let locAddr = s.locationAddress.trimmingCharacters(in: .whitespaces)
+            if !s.realLocation.trimmingCharacters(in: .whitespaces).isEmpty {
+                locName = s.realLocation.trimmingCharacters(in: .whitespaces)
+            } else {
+                locName = s.decoradoOnly.trimmingCharacters(in: .whitespaces)
+            }
+            guard !locName.isEmpty else { continue }
+            let key = locName.lowercased()
+            if !existingNames.contains(key) {
+                existingNames.insert(key)
+                locationRoster.append(Location(name: locName, address: locAddr))
+            }
         }
     }
 }

@@ -15,6 +15,10 @@ struct CineSchedApp: App {
     @AppStorage("cinesched_app_language") private var appLanguage: AppLanguage = .english
     @AppStorage("CineSchedTheme") private var currentTheme: AppTheme = .blue
 
+    init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     var body: some SwiftUI.Scene {
         WindowGroup {
             ContentView()
